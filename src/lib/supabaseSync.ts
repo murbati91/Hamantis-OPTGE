@@ -2,16 +2,23 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Card, CollectionEntry, Deck, Match, Tournament } from '../types'
 
 /**
- * OPT-IN Supabase cloud sync. The app is local-first; this only runs when the
- * user has entered a project URL + anon key in Settings and signed in. Data is
- * pushed/pulled per authenticated user (RLS keyed on auth.uid()).
+ * OPT-IN Supabase cloud sync, authenticated via CLERK (Supabase third-party
+ * auth). The app is Clerk-gated, so the user is always signed in; the Supabase
+ * client forwards the Clerk session token on every request (`accessToken`), and
+ * RLS keys each row on the Clerk subject claim (`auth.jwt()->>'sub'`). See
+ * docs/SUPABASE_SYNC.md for the SQL (tables + RLS).
  *
- * supabase-js is loaded lazily (dynamic import) so the local-only bundle stays
- * lean and the app never depends on the network unless you turn sync on.
- *
- * Backend tables live in the `public` schema — see docs/SUPABASE_SYNC.md for
- * the SQL (tables + RLS) to run once in the project's SQL editor.
+ * supabase-js is loaded lazily (dynamic import) so the bundle stays lean.
  */
+
+declare global {
+  interface Window {
+    Clerk?: {
+      session?: { getToken: (opts?: { template?: string }) => Promise<string | null> }
+      user?: { id: string } | null
+    }
+  }
+}
 
 export type SyncData = {
   entries: CollectionEntry[]
@@ -24,14 +31,21 @@ export type SyncData = {
 
 let cached: { url: string; key: string; client: SupabaseClient } | null = null
 
-/** Lazily create (and memoise) a client scoped to the `hamantis` schema. */
+/** Lazily create (and memoise) a Supabase client that authenticates as the Clerk user. */
 export async function getClient(url: string, anonKey: string): Promise<SupabaseClient> {
   if (cached && cached.url === url && cached.key === anonKey) return cached.client
   const { createClient } = await import('@supabase/supabase-js')
-  // Tables live in the default `public` schema so the Data API exposes them
-  // with no extra config (this project is dedicated to the app).
   const client = createClient(url, anonKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    // Every request is authenticated as the signed-in Clerk user. Supabase
+    // validates the token via the Clerk third-party auth integration, so RLS
+    // sees the Clerk user id in auth.jwt()->>'sub'.
+    accessToken: async () => {
+      try {
+        return (await window.Clerk?.session?.getToken()) ?? null
+      } catch {
+        return null
+      }
+    },
   })
   cached = { url, key: anonKey, client }
   return client
@@ -48,63 +62,20 @@ function assertConfig(cfg: Partial<SyncConfig>): asserts cfg is SyncConfig {
   }
 }
 
-// ---- Auth (passwordless email code) ----
-
-export async function sendLoginCode(cfg: Partial<SyncConfig>, email: string): Promise<void> {
-  assertConfig(cfg)
-  const client = await getClient(cfg.url, cfg.anonKey)
-  const { error } = await client.auth.signInWithOtp({
-    email: email.trim(),
-    options: { shouldCreateUser: true },
-  })
-  if (error) throw new Error(error.message)
-}
-
-export async function verifyLoginCode(
-  cfg: Partial<SyncConfig>,
-  email: string,
-  code: string,
-): Promise<string> {
-  assertConfig(cfg)
-  const client = await getClient(cfg.url, cfg.anonKey)
-  const { data, error } = await client.auth.verifyOtp({
-    email: email.trim(),
-    token: code.trim(),
-    type: 'email',
-  })
-  if (error) throw new Error(error.message)
-  const userEmail = data.user?.email
-  if (!userEmail) throw new Error('Sign-in did not return a user.')
-  return userEmail
-}
-
-export async function currentUserEmail(cfg: Partial<SyncConfig>): Promise<string | null> {
-  if (!cfg.url || !cfg.anonKey) return null
-  const client = await getClient(cfg.url, cfg.anonKey)
-  const { data } = await client.auth.getSession()
-  return data.session?.user?.email ?? null
-}
-
-export async function signOut(cfg: Partial<SyncConfig>): Promise<void> {
-  if (!cfg.url || !cfg.anonKey) return
-  const client = await getClient(cfg.url, cfg.anonKey)
-  await client.auth.signOut()
+/** The signed-in Clerk user's id — the RLS subject that owns the synced rows. */
+function clerkUserId(): string {
+  const id = typeof window !== 'undefined' ? window.Clerk?.user?.id : null
+  if (!id) throw new Error('Not signed in. Sign in to sync.')
+  return id
 }
 
 // ---- Push / Pull ----
-
-async function requireUserId(client: SupabaseClient): Promise<string> {
-  const { data } = await client.auth.getSession()
-  const id = data.session?.user?.id
-  if (!id) throw new Error('Not signed in. Sign in with your email first.')
-  return id
-}
 
 /** Push all local data to the cloud (upsert; last write wins on each row). */
 export async function pushAll(cfg: Partial<SyncConfig>, data: SyncData): Promise<void> {
   assertConfig(cfg)
   const client = await getClient(cfg.url, cfg.anonKey)
-  const userId = await requireUserId(client)
+  const userId = clerkUserId()
 
   const collectionRows = data.entries.map((e) => ({
     user_id: userId,
@@ -138,7 +109,7 @@ export async function pushAll(cfg: Partial<SyncConfig>, data: SyncData): Promise
 export async function pullAll(cfg: Partial<SyncConfig>): Promise<SyncData> {
   assertConfig(cfg)
   const client = await getClient(cfg.url, cfg.anonKey)
-  await requireUserId(client)
+  clerkUserId() // ensure signed in (RLS scopes the rows to this user)
 
   const grab = async <T>(table: string): Promise<T[]> => {
     const { data, error } = await client.from(table).select('*')

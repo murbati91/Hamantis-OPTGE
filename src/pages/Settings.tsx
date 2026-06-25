@@ -1,16 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useCollection } from '../store/useCollection'
 import { usePWAInstall } from '../lib/usePWAInstall'
 import { importApitcgSet, importAllApitcg, type ImportProgress } from '../lib/apitcg'
 import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY, HAS_DEFAULT_SUPABASE } from '../config'
-import {
-  sendLoginCode,
-  verifyLoginCode,
-  currentUserEmail,
-  signOut,
-  pushAll,
-  pullAll,
-} from '../lib/supabaseSync'
+import { pushAll, pullAll } from '../lib/supabaseSync'
+import { useUser } from '@clerk/clerk-react'
 
 export function Settings() {
   const { settings, setSettings, entries, customCards } = useCollection()
@@ -111,69 +105,17 @@ function CloudSync() {
     anonKey: settings.supabaseAnonKey || DEFAULT_SUPABASE_ANON_KEY,
   }
   const configured = !!(cfg.url && cfg.anonKey)
+  const { user } = useUser()
+  const email = user?.primaryEmailAddress?.emailAddress
 
-  const [user, setUser] = useState<string | null>(null)
-  const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
-  const [phase, setPhase] = useState<'idle' | 'sending' | 'codeSent' | 'verifying' | 'syncing'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'syncing'>('idle')
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
-  const busy = phase === 'sending' || phase === 'verifying' || phase === 'syncing'
+  const busy = phase === 'syncing'
 
-  useEffect(() => {
-    let active = true
-    currentUserEmail(cfg)
-      .then((u) => active && setUser(u))
-      .catch(() => active && setUser(null))
-    return () => {
-      active = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.supabaseUrl, settings.supabaseAnonKey])
-
-  const fail = (e: unknown, back: typeof phase) => {
+  const fail = (e: unknown) => {
     setErr(e instanceof Error ? e.message : 'Something went wrong.')
-    setPhase(back)
-  }
-
-  const send = async () => {
-    setErr('')
-    setMsg('')
-    setPhase('sending')
-    try {
-      await sendLoginCode(cfg, email)
-      setPhase('codeSent')
-      setMsg(`We emailed a 6-digit code to ${email}. Enter it below.`)
-    } catch (e) {
-      fail(e, 'idle')
-    }
-  }
-
-  const verify = async () => {
-    setErr('')
-    setMsg('')
-    setPhase('verifying')
-    try {
-      const u = await verifyLoginCode(cfg, email, code)
-      setUser(u)
-      setCode('')
-      setPhase('idle')
-      setMsg(`Signed in as ${u}. Now Push to back up this device.`)
-    } catch (e) {
-      fail(e, 'codeSent')
-    }
-  }
-
-  const doSignOut = async () => {
-    setErr('')
-    setMsg('')
-    try {
-      await signOut(cfg)
-      setUser(null)
-      setMsg('Signed out. Your local data stays on this device.')
-    } catch (e) {
-      fail(e, 'idle')
-    }
+    setPhase('idle')
   }
 
   const push = async () => {
@@ -191,7 +133,7 @@ function CloudSync() {
       setPhase('idle')
       setMsg('✓ Pushed your collection to the cloud.')
     } catch (e) {
-      fail(e, 'idle')
+      fail(e)
     }
   }
 
@@ -207,7 +149,7 @@ function CloudSync() {
         `✓ Pulled ${data.entries.length} owned cards, ${data.decks.length} decks, ${data.matches.length} matches, ${data.tournaments.length} tournaments.`,
       )
     } catch (e) {
-      fail(e, 'idle')
+      fail(e)
     }
   }
 
@@ -250,10 +192,12 @@ function CloudSync() {
         )}
 
         {!configured ? (
-          <p className="text-xs text-slate-500">Enter your project URL and anon key to enable sync.</p>
-        ) : user ? (
+          <p className="text-xs text-slate-500">Cloud sync backend isn’t configured.</p>
+        ) : (
           <div className="space-y-3">
-            <p className="text-xs text-mantis-300">Signed in as {user}</p>
+            <p className="text-xs text-mantis-300">
+              Synced to your account{email ? ` (${email})` : ''}.
+            </p>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => void push()}
@@ -269,58 +213,7 @@ function CloudSync() {
               >
                 Pull from cloud
               </button>
-              <button
-                onClick={() => void doSignOut()}
-                disabled={busy}
-                className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-40"
-              >
-                Sign out
-              </button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex items-end gap-2">
-              <label className="block flex-1">
-                <span className="mb-1 block text-xs font-medium text-slate-400">Email</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className={inputCls}
-                  autoComplete="email"
-                />
-              </label>
-              <button
-                onClick={() => void send()}
-                disabled={busy || !email.trim()}
-                className="rounded-lg bg-mantis-600 px-4 py-2 text-sm font-medium text-white hover:bg-mantis-500 disabled:opacity-40"
-              >
-                {phase === 'sending' ? 'Sending…' : 'Send code'}
-              </button>
-            </div>
-            {(phase === 'codeSent' || phase === 'verifying') && (
-              <div className="flex items-end gap-2">
-                <label className="block flex-1">
-                  <span className="mb-1 block text-xs font-medium text-slate-400">6-digit code</span>
-                  <input
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="123456"
-                    inputMode="numeric"
-                    className={inputCls}
-                  />
-                </label>
-                <button
-                  onClick={() => void verify()}
-                  disabled={busy || !code.trim()}
-                  className="rounded-lg bg-mantis-600 px-4 py-2 text-sm font-medium text-white hover:bg-mantis-500 disabled:opacity-40"
-                >
-                  {phase === 'verifying' ? 'Verifying…' : 'Verify'}
-                </button>
-              </div>
-            )}
           </div>
         )}
 
