@@ -11,6 +11,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
     "@supabase/supabase-js": "^2.108.2",
     "idb": "^8.0.0",
     "react": "^18.3.1",
