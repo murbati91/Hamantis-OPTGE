@@ -3,7 +3,7 @@ import { useCollection } from '../store/useCollection'
 import { useProgress } from '../store/useProgress'
 import { generateSealedPool } from '../features/sealed/poolGenerator'
 import { analyzeDeck, DECK_TARGET_SIZE, deckSize } from '../features/sealed/deckEngine'
-import { CardImage } from '../components/ui/CardImage'
+import { CardFace } from '../components/ui/CardFace'
 import { RatingPill } from '../components/ui/RatingPill'
 import { ColorDot } from '../components/ui/Badge'
 import type { Card, Deck, PoolCard, SealedPool, TargetStatus } from '../types'
@@ -29,7 +29,7 @@ interface PoolGroup {
 }
 
 export function DeckBuilder() {
-  const { resolveCard, fullIndex, settings, decks, upsertDeck, removeDeck } =
+  const { resolveCard, fullIndex, decks, upsertDeck, removeDeck } =
     useCollection()
   const { recordTraining, awardBadge } = useProgress()
 
@@ -38,8 +38,6 @@ export function DeckBuilder() {
   const [deck, setDeck] = useState<Deck>(emptyDeck)
   const [sort, setSort] = useState<SortMode>('rating')
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
-
-  const allowRemote = settings.allowRemoteImages
 
   // Group opened pool copies by cardId -> available count.
   const groups = useMemo<PoolGroup[]>(() => {
@@ -192,7 +190,7 @@ export function DeckBuilder() {
                         : 'border-slate-800 bg-ink-850/50 hover:border-mantis-700/60'
                     }`}
                   >
-                    <CardImage card={l} allowRemote={allowRemote} />
+                    <CardFace card={l} size="md" />
                     <div className="mt-2 line-clamp-1 text-sm font-medium text-slate-100">
                       {l.name}
                     </div>
@@ -285,7 +283,7 @@ export function DeckBuilder() {
                     className="rounded-xl border border-slate-800 bg-ink-850/50 p-2"
                   >
                     <div className="relative">
-                      <CardImage card={g.card} allowRemote={allowRemote} />
+                      <CardFace card={g.card} size="sm" />
                       <span className="absolute right-1 top-1">
                         <RatingPill rating={g.card.sealedRating} />
                       </span>

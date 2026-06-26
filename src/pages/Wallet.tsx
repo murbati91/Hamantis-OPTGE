@@ -1,7 +1,7 @@
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCollection } from '../store/useCollection'
-import { CardImage } from '../components/ui/CardImage'
+import { CardFace } from '../components/ui/CardFace'
 import { RatingPill } from '../components/ui/RatingPill'
 import { is2kCounter, isBlocker, isRemoval } from '../lib/cards'
 import { InfoTip } from '../components/ui/InfoTip'
@@ -175,7 +175,6 @@ export function Wallet() {
                 key={c.id}
                 card={c}
                 quantity={entries[c.id]?.quantity ?? 0}
-                allowRemote={settings.allowRemoteImages}
               />
             ))}
           </div>
@@ -193,11 +192,9 @@ export function Wallet() {
 const WalletCard = memo(function WalletCard({
   card,
   quantity,
-  allowRemote,
 }: {
   card: Card
   quantity: number
-  allowRemote: boolean
 }) {
   const owned = quantity > 0
   return (
@@ -216,7 +213,7 @@ const WalletCard = memo(function WalletCard({
             owned ? '' : 'opacity-65 grayscale-[0.3] group-hover:opacity-100 group-hover:grayscale-0'
           }`}
         >
-          <CardImage card={card} allowRemote={allowRemote} />
+          <CardFace card={card} size="sm" />
         </div>
 
         {owned && (

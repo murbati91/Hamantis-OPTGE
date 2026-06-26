@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useCollection } from '../store/useCollection'
-import { CardImage } from '../components/ui/CardImage'
+import { CardFace } from '../components/ui/CardFace'
 import { RatingPill } from '../components/ui/RatingPill'
 import { Badge, ColorDot } from '../components/ui/Badge'
 import { tierForRating } from '../data/ratingScale'
@@ -88,7 +88,7 @@ export function CardDetail() {
             qty > 0 ? 'ring-2 ring-straw-400/70' : 'ring-1 ring-slate-800'
           }`}
         >
-          <CardImage card={card} />
+          <CardFace card={card} size="lg" />
         </div>
 
         <div className="space-y-3">
