@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCollection } from '../store/useCollection'
 import { useProgress } from '../store/useProgress'
-import { CardImage } from '../components/ui/CardImage'
+import { CardFace } from '../components/ui/CardFace'
+import { HeadToHead, type ClashView } from '../features/play/HeadToHead'
+import { Tutorial } from '../features/play/Tutorial'
 import { initGame, apply, def, effPower, opp } from '../features/play/engine'
 import { nextBotAction, botDefend } from '../features/play/bot'
+import type { Card } from '../types'
 import type { Difficulty, GameState, Side } from '../features/play/types'
 
 const DIFFS: { id: Difficulty; label: string; blurb: string }[] = [
@@ -14,6 +17,9 @@ const DIFFS: { id: Difficulty; label: string; blurb: string }[] = [
 ]
 
 const DIFF_KEY = 'hamantis.play.difficulty'
+const TUT_KEY = 'hamantis.play.tutorialSeen'
+/** Head-to-head clash animation length (ms). Must outlast the keyframes. */
+const CLASH_MS = 1150
 
 function loadDifficulty(): Difficulty {
   try {
@@ -25,9 +31,82 @@ function loadDifficulty(): Difficulty {
   return 'normal'
 }
 
+function loadTutorialSeen(): boolean {
+  try {
+    return localStorage.getItem(TUT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 /** Whether the user has asked the OS to minimise motion. */
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/** cardId of a board character by uid (or '' if it's gone). */
+function charCardId(g: GameState, side: Side, uid: string): string {
+  return g.players[side].board.find((c) => c.uid === uid)?.cardId ?? ''
+}
+
+/**
+ * Build the cosmetic clash view for a pending attack — READ ONLY. The outcome is
+ * derived by running the engine's resolveDefense on a throwaway copy (apply()
+ * already clones and never mutates its input), so labels stay in lock-step with
+ * the real resolution without duplicating any combat logic.
+ */
+function buildClashView(g: GameState, resolveCard: (id: string) => Card | undefined): ClashView | null {
+  const pd = g.pending
+  if (!pd) return null
+  const atkSide = pd.attackerSide
+  const defSide = opp(atkSide)
+
+  const atkLeader = pd.attacker === 'leader'
+  const attackerCard = atkLeader
+    ? resolveCard(g.players[atkSide].leaderId)
+    : resolveCard(charCardId(g, atkSide, pd.attacker))
+  const attackerPow = pd.baseAttackPower
+
+  const targetRef = pd.blockerUid ?? pd.target
+  const defLeader = targetRef === 'leader'
+  const defenderCard = defLeader
+    ? resolveCard(g.players[defSide].leaderId)
+    : resolveCard(charCardId(g, defSide, targetRef))
+  const defenderPow = effPower(g, defSide, targetRef) + pd.counterAdded
+
+  const after = apply(g, { t: 'resolveDefense' })
+
+  let result: string
+  let tone: ClashView['tone']
+  if (after.winner !== null && g.winner === null) {
+    result = after.winner === 0 ? 'You win! 🏴‍☠️' : 'Defeat…'
+    tone = after.winner === 0 ? 'good' : 'bad'
+  } else if (defLeader) {
+    const lostLife = after.players[defSide].life < g.players[defSide].life
+    if (lostLife) {
+      result = '−1 Life'
+      tone = defSide === 0 ? 'bad' : 'good'
+    } else {
+      result = 'Survived'
+      tone = defSide === 0 ? 'good' : 'neutral'
+    }
+  } else {
+    const stillThere = after.players[defSide].board.some((c) => c.uid === targetRef)
+    if (!stillThere) {
+      result = 'K.O.!'
+      tone = defSide === 0 ? 'bad' : 'good'
+    } else {
+      result = pd.blockerUid ? 'Blocked!' : 'Survived'
+      tone = defSide === 0 ? 'good' : 'neutral'
+    }
+  }
+
+  return {
+    attacker: { card: attackerCard, power: attackerPow, isLeader: atkLeader, label: atkSide === 0 ? 'You' : 'Bot' },
+    defender: { card: defenderCard, power: defenderPow, isLeader: defLeader, label: defSide === 0 ? 'You' : 'Bot' },
+    result,
+    tone,
+  }
 }
 
 export function Play() {
@@ -39,8 +118,13 @@ export function Play() {
   const [game, setGame] = useState<GameState | null>(null)
   const [attacker, setAttacker] = useState<'leader' | string | null>(null)
   const [revealing, setRevealing] = useState(false)
+  // Cosmetic head-to-head overlay. While non-null the bot driver is gated so the
+  // real resolveDefense happens only when the animation finishes.
+  const [clash, setClash] = useState<ClashView | null>(null)
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => !loadTutorialSeen())
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const awarded = useRef(false)
 
   const pickDifficulty = (d: Difficulty) => {
@@ -52,11 +136,54 @@ export function Play() {
     }
   }
 
+  const closeTutorial = () => {
+    setShowTutorial(false)
+    try {
+      localStorage.setItem(TUT_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Cancel any in-flight clash and hide the overlay (used on reset / unmount). */
+  const resetClash = useCallback(() => {
+    if (clashTimer.current) {
+      clearTimeout(clashTimer.current)
+      clashTimer.current = null
+    }
+    setClash(null)
+  }, [])
+
+  /**
+   * Show the head-to-head overlay for the current pending attack, then commit the
+   * real resolveDefense once it finishes. Functional setGame guards against the
+   * game being reset mid-animation. Never blocks input permanently: the timer is
+   * always cleaned up and the resolve is a no-op if the pending is gone.
+   */
+  const beginClash = useCallback(
+    (g: GameState) => {
+      const view = buildClashView(g, resolveCard)
+      if (!view) {
+        setGame((s) => (s && s.winner === null && s.pending ? apply(s, { t: 'resolveDefense' }) : s))
+        return
+      }
+      setClash(view)
+      if (clashTimer.current) clearTimeout(clashTimer.current)
+      clashTimer.current = setTimeout(() => {
+        clashTimer.current = null
+        setClash(null)
+        setGame((s) => (s && s.winner === null && s.pending ? apply(s, { t: 'resolveDefense' }) : s))
+      }, CLASH_MS)
+    },
+    [resolveCard],
+  )
+
   const newGame = () => {
     const youDeck = decks.find((d) => d.id === deckId) ?? null
     recordPlay() // tracks games-played-today (no cap — unlimited bot practice)
     awarded.current = false
     setAttacker(null)
+    resetClash()
     setGame(initGame({ youDeck }, resolveCard))
     // Sealed-box flip intro (skipped when the user prefers reduced motion).
     if (revealTimer.current) clearTimeout(revealTimer.current)
@@ -68,10 +195,21 @@ export function Play() {
     }
   }
 
-  // Clean up the reveal timer on unmount.
-  useEffect(() => () => {
-    if (revealTimer.current) clearTimeout(revealTimer.current)
-  }, [])
+  const backToStart = () => {
+    resetClash()
+    setAttacker(null)
+    setGame(null)
+  }
+
+  // Clean up all timers on unmount.
+  useEffect(
+    () => () => {
+      if (revealTimer.current) clearTimeout(revealTimer.current)
+      if (clashTimer.current) clearTimeout(clashTimer.current)
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
 
   // ---- driver: advance the bot's turn / its defense automatically ----
   useEffect(() => {
@@ -79,19 +217,34 @@ export function Play() {
     // win / unmount can never leave an orphaned setTimeout to clobber fresh state.
     if (timer.current) clearTimeout(timer.current)
     if (!game || game.winner !== null) return
+    // A head-to-head clash is animating — pause the driver; it resumes when the
+    // clash clears (resolveDefense fires, game changes, this effect re-runs).
+    if (clash) return
 
     if (game.pending) {
       const defender = opp(game.pending.attackerSide)
       if (defender === 1) {
-        // bot is defending an attack you declared — guarded functional update so a
-        // stale closure can't resurrect a game you've since reset.
+        // bot is defending an attack you declared.
         timer.current = setTimeout(() => {
-          setGame((s) => {
-            if (!s || s.winner !== null || !s.pending) return s
-            let g = s
-            for (const a of botDefend(g, difficulty)) g = apply(g, a)
-            return g
-          })
+          const g0 = game
+          if (!g0 || g0.winner !== null || !g0.pending) return
+          const acts = botDefend(g0, difficulty)
+          if (prefersReducedMotion()) {
+            // No animation — resolve in one shot (original behavior).
+            let g = g0
+            for (const a of acts) g = apply(g, a)
+            setGame(g)
+            return
+          }
+          // Apply the bot's block/counter choices first so the board reflects
+          // them, then visualize the clash and resolve when it ends.
+          let staged = g0
+          for (const a of acts) {
+            if (a.t === 'resolveDefense') break
+            staged = apply(staged, a)
+          }
+          setGame(staged)
+          beginClash(staged)
         }, 500)
       }
       // else: human defends via the modal — no timer, but cleanup below still runs.
@@ -102,7 +255,7 @@ export function Play() {
     return () => {
       if (timer.current) clearTimeout(timer.current)
     }
-  }, [game, difficulty])
+  }, [game, difficulty, clash, beginClash])
 
   // Award XP once when a duel finishes (counts toward Training progress).
   useEffect(() => {
@@ -115,7 +268,10 @@ export function Play() {
   if (!game) {
     return (
       <div className="mx-auto max-w-md space-y-4 py-10 text-center">
-        <h1 className="text-xl font-bold text-mantis-100">Practice Duel vs Bot</h1>
+        <div className="flex items-center justify-center gap-2">
+          <h1 className="text-xl font-bold text-mantis-100">Practice Duel vs Bot</h1>
+          <HelpButton onClick={() => setShowTutorial(true)} />
+        </div>
         <p className="text-sm text-slate-400">
           Play a simplified One Piece TCG game against the AI — DON ramp, characters, attacks,
           blocks &amp; counters. Card-specific effects come later.
@@ -176,19 +332,21 @@ export function Play() {
         >
           Start duel
         </button>
+
+        {showTutorial && <Tutorial onClose={closeTutorial} />}
       </div>
     )
   }
 
   const you = game.players[0]
-  const yourTurn = game.active === 0 && game.winner === null && !game.pending
+  const yourTurn = game.active === 0 && game.winner === null && !game.pending && !clash
   const defending = game.pending && opp(game.pending.attackerSide) === 0
 
   // ---- human actions ----
   const act = (a: Parameters<typeof apply>[1]) => setGame((s) => (s ? apply(s, a) : s))
 
   const onYourCardClick = (ref: 'leader' | string, rested: boolean, sick: boolean) => {
-    if (game.active !== 0 || game.pending) return
+    if (clash || game.active !== 0 || game.pending) return
     if (game.phase === 'main') {
       if (you.donAvailable > 0) act({ t: 'attachDon', target: ref })
     } else if (game.phase === 'attack') {
@@ -196,9 +354,19 @@ export function Play() {
     }
   }
   const onEnemyTargetClick = (ref: 'leader' | string) => {
-    if (!yourTurn || game.phase !== 'attack' || !attacker) return
+    if (clash || !yourTurn || game.phase !== 'attack' || !attacker) return
     act({ t: 'declareAttack', attacker, target: ref })
     setAttacker(null)
+  }
+
+  // Human commits a defense — visualize the clash, then resolve (instant under
+  // reduced motion).
+  const onResolveDefense = () => {
+    if (prefersReducedMotion()) {
+      act({ t: 'resolveDefense' })
+      return
+    }
+    if (game.pending) beginClash(game)
   }
 
   const activeDiff = DIFFS.find((d) => d.id === difficulty)
@@ -212,8 +380,9 @@ export function Play() {
           <span className="rounded-full border border-straw-400/50 bg-straw-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-straw-300">
             {activeDiff?.label}
           </span>
+          <HelpButton onClick={() => setShowTutorial(true)} />
         </div>
-        <button onClick={() => setGame(null)} className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">
+        <button onClick={backToStart} className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">
           New game
         </button>
       </div>
@@ -258,11 +427,10 @@ export function Play() {
                 key={id + i}
                 onClick={() => playable && act({ t: 'play', cardId: id })}
                 disabled={!playable}
-                className={`relative w-16 shrink-0 overflow-hidden rounded-lg ring-1 transition ${playable ? 'ring-mantis-500 hover:-translate-y-1' : 'opacity-70 ring-slate-800'}`}
+                className={`w-16 shrink-0 rounded-lg ring-1 transition ${playable ? 'ring-mantis-500 hover:-translate-y-1' : 'opacity-70 ring-slate-800'}`}
                 title={d.name}
               >
-                <Mini card={resolveCard(id)} />
-                <span className="absolute left-0.5 top-0.5 rounded bg-black/70 px-1 text-[0.6rem] font-bold text-white">◆{d.cost}</span>
+                <CardFace card={resolveCard(id)} size="sm" />
               </button>
             )
           })}
@@ -283,13 +451,16 @@ export function Play() {
         </div>
       )}
 
-      {/* Defense modal */}
-      {defending && game.pending && (
-        <DefenseModal g={game} onAct={act} />
+      {/* Defense modal — hidden while the clash animation is on screen */}
+      {defending && game.pending && !clash && (
+        <DefenseModal g={game} resolve={resolveCard} onAct={act} onResolve={onResolveDefense} />
       )}
 
+      {/* Head-to-head clash overlay (cosmetic; caller skips it under reduced motion) */}
+      {clash && <HeadToHead view={clash} />}
+
       {/* Result screen */}
-      {game.winner !== null && (
+      {game.winner !== null && !clash && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-xs rounded-2xl border border-slate-700 bg-ink-900 p-6 text-center">
             <div className="text-4xl">{game.winner === 0 ? '🏴‍☠️' : '💀'}</div>
@@ -306,7 +477,7 @@ export function Play() {
               Play again
             </button>
             <button
-              onClick={() => setGame(null)}
+              onClick={backToStart}
               className="mt-2 w-full rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800"
             >
               Back to start
@@ -322,7 +493,24 @@ export function Play() {
           {[...game.log].reverse().slice(0, 12).map((l, i) => <div key={i}>{l}</div>)}
         </div>
       </details>
+
+      {showTutorial && <Tutorial onClose={closeTutorial} />}
     </div>
+  )
+}
+
+/** Small persistent "?" help button that (re)opens the first-time guide. */
+function HelpButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="How to play"
+      title="How to play"
+      className="grid h-6 w-6 place-items-center rounded-full border border-straw-400/60 bg-straw-500/10 text-xs font-bold text-straw-300 hover:bg-straw-500/20"
+    >
+      ?
+    </button>
   )
 }
 
@@ -380,11 +568,6 @@ function SealedReveal() {
   )
 }
 
-function Mini({ card }: { card: ReturnType<ReturnType<typeof useCollection>['resolveCard']> }) {
-  if (!card) return <div className="aspect-[5/7] w-full bg-ink-850" />
-  return <CardImage card={card} className="!rounded-none" />
-}
-
 function PlayerStrip({
   g, side, label, resolve, onCard, onTarget, selected, targetable,
 }: {
@@ -421,11 +604,10 @@ function PlayerStrip({
         {/* leader */}
         <button
           onClick={() => (enemy ? onTarget?.('leader') : onCard?.('leader', p.leaderRested, false))}
-          className={`relative w-16 shrink-0 overflow-hidden rounded-lg ring-2 ${selected === 'leader' ? 'ring-straw-400' : enemy && targetable ? 'ring-rose-500 animate-pulse' : 'ring-mantis-700/60'} ${p.leaderRested || ownInactive(p.leaderRested, false) ? 'opacity-50' : ''}`}
+          className={`w-16 shrink-0 rounded-lg ring-2 ${selected === 'leader' ? 'ring-straw-400' : enemy && targetable ? 'ring-rose-500 animate-pulse' : 'ring-mantis-700/60'} ${p.leaderRested || ownInactive(p.leaderRested, false) ? 'opacity-50' : ''}`}
           title="Leader"
         >
-          <Mini card={leaderCard} />
-          <Power v={effPower(g, side, 'leader')} />
+          <CardFace card={leaderCard} power={effPower(g, side, 'leader')} size="sm" />
         </button>
         {/* characters */}
         {p.board.map((c) => {
@@ -434,11 +616,10 @@ function PlayerStrip({
             <button
               key={c.uid}
               onClick={() => (enemy ? c.rested && onTarget?.(c.uid) : onCard?.(c.uid, c.rested, c.playedThisTurn))}
-              className={`relative w-14 shrink-0 overflow-hidden rounded-lg ring-1 ${selected === c.uid ? 'ring-2 ring-straw-400' : targetableChar ? 'ring-2 ring-rose-500 animate-pulse' : 'ring-slate-700'} ${c.rested || ownInactive(c.rested, c.playedThisTurn) ? 'opacity-50' : ''}`}
+              className={`w-14 shrink-0 rounded-lg ring-1 ${selected === c.uid ? 'ring-2 ring-straw-400' : targetableChar ? 'ring-2 ring-rose-500 animate-pulse' : 'ring-slate-700'} ${c.rested || ownInactive(c.rested, c.playedThisTurn) ? 'opacity-50' : ''}`}
               title={def(g, c.cardId).name}
             >
-              <Mini card={resolve(c.cardId)} />
-              <Power v={def(g, c.cardId).power + c.attachedDon * 1000} />
+              <CardFace card={resolve(c.cardId)} power={def(g, c.cardId).power + c.attachedDon * 1000} size="xs" />
             </button>
           )
         })}
@@ -448,11 +629,17 @@ function PlayerStrip({
   )
 }
 
-function Power({ v }: { v: number }) {
-  return <span className="absolute bottom-0.5 right-0.5 rounded bg-mantis-700/90 px-1 text-[0.6rem] font-bold text-white">{v}</span>
-}
-
-function DefenseModal({ g, onAct }: { g: GameState; onAct: (a: Parameters<typeof apply>[1]) => void }) {
+function DefenseModal({
+  g,
+  resolve,
+  onAct,
+  onResolve,
+}: {
+  g: GameState
+  resolve: ReturnType<typeof useCollection>['resolveCard']
+  onAct: (a: Parameters<typeof apply>[1]) => void
+  onResolve: () => void
+}) {
   const pd = g.pending!
   const me: Side = 0
   const p = g.players[me]
@@ -462,11 +649,30 @@ function DefenseModal({ g, onAct }: { g: GameState; onAct: (a: Parameters<typeof
   const targetPow = effPower(g, me, tgt) + pd.counterAdded
   const blockers = p.board.filter((c) => !c.rested && def(g, c.cardId).isBlocker)
   const counters = p.hand.filter((id) => def(g, id).counter > 0)
+
+  // Card-face previews of the incoming attacker vs your defending card.
+  const atkSide = pd.attackerSide
+  const attackerCard =
+    pd.attacker === 'leader' ? resolve(g.players[atkSide].leaderId) : resolve(charCardId(g, atkSide, pd.attacker))
+  const targetCard = tgt === 'leader' ? resolve(g.players[me].leaderId) : resolve(charCardId(g, me, tgt))
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center">
       <div className="w-full max-w-md rounded-2xl border border-rose-700/60 bg-ink-900 p-4">
         <h3 className="text-sm font-bold text-rose-200">Bot attacks {onLeader ? 'your Leader' : 'your character'}!</h3>
-        <p className="mt-1 text-xs text-slate-300">
+
+        {/* attacker vs defender preview */}
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <div className="w-16">
+            <CardFace card={attackerCard} power={pd.baseAttackPower} size="sm" />
+          </div>
+          <span className="text-lg" aria-hidden="true">⚔️</span>
+          <div className="w-16">
+            <CardFace card={targetCard} power={targetPow} size="sm" />
+          </div>
+        </div>
+
+        <p className="mt-2 text-center text-xs text-slate-300">
           Attack power <b className="text-rose-300">{pd.baseAttackPower}</b> vs your{' '}
           <b className="text-mantis-200">{targetPow}</b>. {pd.baseAttackPower >= targetPow ? 'It would hit.' : 'You survive.'}
         </p>
@@ -475,8 +681,15 @@ function DefenseModal({ g, onAct }: { g: GameState; onAct: (a: Parameters<typeof
             <div className="text-xs text-slate-400">Block (redirect to a Blocker):</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {blockers.map((c) => (
-                <button key={c.uid} onClick={() => onAct({ t: 'block', blockerUid: c.uid })} className="rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
-                  🧱 {def(g, c.cardId).name}
+                <button
+                  key={c.uid}
+                  onClick={() => onAct({ t: 'block', blockerUid: c.uid })}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                >
+                  <span className="w-7 shrink-0">
+                    <CardFace card={resolve(c.cardId)} size="xs" />
+                  </span>
+                  🛡 {def(g, c.cardId).name}
                 </button>
               ))}
             </div>
@@ -487,14 +700,21 @@ function DefenseModal({ g, onAct }: { g: GameState; onAct: (a: Parameters<typeof
             <div className="text-xs text-slate-400">Counter from hand (+power):</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {counters.map((id, i) => (
-                <button key={id + i} onClick={() => onAct({ t: 'counter', cardId: id })} className="rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+                <button
+                  key={id + i}
+                  onClick={() => onAct({ t: 'counter', cardId: id })}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                >
+                  <span className="w-7 shrink-0">
+                    <CardFace card={resolve(id)} size="xs" />
+                  </span>
                   +{def(g, id).counter} {def(g, id).name}
                 </button>
               ))}
             </div>
           </div>
         )}
-        <button onClick={() => onAct({ t: 'resolveDefense' })} className="mt-4 w-full rounded-lg bg-mantis-600 px-4 py-2 text-sm font-semibold text-white hover:bg-mantis-500">
+        <button onClick={onResolve} className="mt-4 w-full rounded-lg bg-mantis-600 px-4 py-2 text-sm font-semibold text-white hover:bg-mantis-500">
           Resolve
         </button>
       </div>

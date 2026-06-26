@@ -38,13 +38,17 @@ export const CLERK_APPEARANCE = {
 export function AuthLanding() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-ink-950 p-6">
-      <div className="max-w-xs text-center">
-        <h1 className="text-xl font-bold text-mantis-100">One Piece TCG GCC</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Sign in or create a free account to access your collection, the deck builder, and the
-          practice arena.
-        </p>
-      </div>
+      <img
+        src="/og-image.png"
+        alt="One Piece TCG GCC — Collection wallet · Sealed simulator · Training"
+        className="w-full max-w-md rounded-2xl border border-slate-800 shadow-xl"
+        width={1200}
+        height={630}
+      />
+      <p className="-mt-2 max-w-xs text-center text-sm text-slate-400">
+        Sign in or create a free account to access your collection, the deck builder, and the
+        practice arena.
+      </p>
 
       <SignIn routing="hash" appearance={CLERK_APPEARANCE} />
 
