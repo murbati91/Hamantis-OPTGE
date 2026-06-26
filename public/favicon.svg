@@ -2,11 +2,12 @@
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#ef4444"/>
-      <stop offset="1" stop-color="#7f1d1d"/>
+      <stop offset="1" stop-color="#991b1b"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" fill="url(#g)"/>
-  <circle cx="256" cy="226" r="150" fill="none" stroke="#fbbf24" stroke-width="10" opacity="0.9"/>
-  <text x="256" y="276" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="156" font-weight="800" fill="#ffffff">OP</text>
-  <text x="256" y="404" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="50" font-weight="700" letter-spacing="5" fill="#fde68a">TCG GCC</text>
+  <rect x="16" y="16" width="480" height="480" rx="120" fill="url(#g)"/>
+  <rect x="16" y="16" width="480" height="480" rx="120" fill="none" stroke="#fbbf24" stroke-width="20" opacity="0.9"/>
+  <ellipse cx="256" cy="312" rx="180" ry="48" fill="#e7b24b" stroke="#9c6315" stroke-width="8"/>
+  <path d="M178 312 C178 188 334 188 334 312 Z" fill="#f0c258" stroke="#9c6315" stroke-width="8"/>
+  <path d="M184 292 C222 308 290 308 328 292 L328 270 C290 286 222 286 184 270 Z" fill="#c81e1e"/>
 </svg>

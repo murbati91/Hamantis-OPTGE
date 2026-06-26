@@ -1,11 +1,16 @@
 import { SignIn } from '@clerk/clerk-react'
-import { Logo } from '../ui/Logo'
 
 /**
  * Clerk appearance tuned to the OP red/gold + ink theme so the hosted sign-in /
- * sign-up flow matches the app instead of Clerk's default light card.
+ * sign-up flow matches the app. `layout.logoImageUrl` puts the straw-hat brand
+ * mark inside the Clerk card header.
  */
 export const CLERK_APPEARANCE = {
+  layout: {
+    logoImageUrl: 'https://onepiecetcggcc.com/icons/icon-192.png',
+    logoLinkUrl: 'https://onepiecetcggcc.com',
+    logoPlacement: 'inside',
+  },
   variables: {
     colorPrimary: '#dc2626', // mantis red
     colorBackground: '#0d1117', // ink-900-ish
@@ -18,6 +23,7 @@ export const CLERK_APPEARANCE = {
   },
   elements: {
     card: 'bg-ink-900 border border-slate-800 shadow-2xl',
+    logoImage: 'h-14 w-14',
     headerTitle: 'text-mantis-100',
     socialButtonsBlockButton: 'border border-slate-700',
     footerActionLink: 'text-mantis-300 hover:text-mantis-200',
@@ -32,10 +38,9 @@ export const CLERK_APPEARANCE = {
 export function AuthLanding() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-ink-950 p-6">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <Logo className="h-14 w-14" />
+      <div className="max-w-xs text-center">
         <h1 className="text-xl font-bold text-mantis-100">One Piece TCG GCC</h1>
-        <p className="max-w-xs text-sm text-slate-400">
+        <p className="mt-1 text-sm text-slate-400">
           Sign in or create a free account to access your collection, the deck builder, and the
           practice arena.
         </p>
