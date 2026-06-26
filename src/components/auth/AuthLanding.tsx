@@ -7,7 +7,7 @@ import { SignIn } from '@clerk/clerk-react'
  */
 export const CLERK_APPEARANCE = {
   layout: {
-    logoImageUrl: 'https://onepiecetcggcc.com/icons/icon-192.png',
+    logoImageUrl: 'https://onepiecetcggcc.com/icons/strawhat-logo.png',
     logoLinkUrl: 'https://onepiecetcggcc.com',
     logoPlacement: 'inside',
   },
