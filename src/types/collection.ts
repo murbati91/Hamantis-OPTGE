@@ -36,6 +36,12 @@ export interface AppSettings {
   /** Optional Supabase cloud-sync config (device-local). Empty = local-only. */
   supabaseUrl?: string
   supabaseAnonKey?: string
+
+  /**
+   * Optional Anthropic API key for the AI deck builder's "Refine with Claude"
+   * upgrade. Stored ONLY on this device. The local deck builder works without it.
+   */
+  anthropicKey?: string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

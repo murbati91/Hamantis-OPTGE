@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/training', label: 'Training', icon: '🎯' },
   { to: '/sealed', label: 'Sealed', icon: '📦' },
   { to: '/deck-builder', label: 'Deck Builder', icon: '🛠️' },
+  { to: '/ai-deck', label: 'AI Deck', icon: '🤖' },
   { to: '/matches', label: 'Matches', icon: '⚔️' },
   { to: '/tournament', label: 'Tournament', icon: '🏆' },
   { to: '/glossary', label: 'Glossary', icon: '📖' },

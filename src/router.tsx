@@ -13,6 +13,7 @@ import { Tournament } from './pages/Tournament'
 import { Glossary } from './pages/Glossary'
 import { Play } from './pages/Play'
 import { PlayGuide } from './pages/PlayGuide'
+import { AIDeckBuilder } from './pages/AIDeckBuilder'
 import { Link } from 'react-router-dom'
 
 function NotFound() {
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
       { path: 'sealed', element: <SealedSimulator /> },
       { path: 'training', element: <TrainingArena /> },
       { path: 'deck-builder', element: <DeckBuilder /> },
+      { path: 'ai-deck', element: <AIDeckBuilder /> },
       { path: 'matches', element: <MatchTracker /> },
       { path: 'tournament', element: <Tournament /> },
       { path: 'play', element: <Play /> },
