@@ -78,8 +78,13 @@ jobs:
           ssh "$USER@$HOST" "rm -rf '$DEST-new' && mkdir -p '$DEST-new'"
           # Staged swap: upload to -new, verify, promote, prune old rollbacks.
           rsync -az --delete dist/ "$USER@$HOST:$DEST-new/"
-          ssh "$USER@$HOST" "test -f '$DEST-new/index.html' && ls '$DEST-new'/assets/index-*.js >/dev/null \
-            && mv '$DEST' '$DEST-old-$STAMP' && mv '$DEST-new' '$DEST' \
-            && ls -dt '$DEST'-old-* 2>/dev/null | tail -n +3 | xargs -r rm -rf \
-            && curl -sf -H 'Host: onepiecetcggcc.com' http://127.0.0.1/ -o /dev/null \
-            && echo DEPLOY_OK"
+          ssh "$USER@$HOST" "
+            set -e
+            test -f '$DEST-new/index.html'
+            ls '$DEST-new'/assets/index-*.js >/dev/null
+            if [ -e '$DEST' ]; then mv '$DEST' '$DEST-old-$STAMP'; fi
+            mv '$DEST-new' '$DEST'
+            ls -dt '$DEST'-old-* 2>/dev/null | tail -n +3 | xargs -r rm -rf || true
+            curl -sf -H 'Host: onepiecetcggcc.com' http://127.0.0.1/ -o /dev/null
+            echo DEPLOY_OK
+          "
