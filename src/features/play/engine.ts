@@ -278,6 +278,11 @@ export function apply(state: GameState, action: Action): GameState {
       return s
     }
     case 'endTurn': {
+      // DON!! given to your Leader/Characters stops boosting once your turn
+      // ends, so the opponent faces your ORIGINAL base power (simplified rule;
+      // the DON itself is restored to your cost area on your next Refresh).
+      p.leaderAttachedDon = 0
+      for (const c of p.board) c.attachedDon = 0
       s.active = opp(me)
       s.turn++
       startTurn(s, s.active)
