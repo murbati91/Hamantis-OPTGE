@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -21,9 +22,14 @@ export interface ProgressState {
   training: TrainingState
   /** Practice-duel daily cap tracking. Count resets when the date changes. */
   play: { date: string; count: number }
+  /** One-time welcome bonus granted (so a new player never starts at a dead 0). */
+  onboarded?: boolean
 }
 
 const KEY = 'hamantis.progress.v1'
+
+/** One-time XP granted on first launch so the level bar shows life immediately. */
+export const WELCOME_XP = 40
 
 /** Practice duels allowed per calendar day (local, MVP — bypassable, see SIMULATOR-SPEC v1.1). */
 export const DAILY_PLAY_LIMIT = 5
@@ -33,6 +39,7 @@ const DEFAULT: ProgressState = {
   badges: [],
   training: DEFAULT_TRAINING_STATE,
   play: { date: '', count: 0 },
+  onboarded: false,
 }
 
 /** Local date as YYYY-MM-DD. */
@@ -64,21 +71,53 @@ export const BADGES: BadgeDef[] = [
   { id: 'tournament-grinder', name: 'Tournament Grinder', description: 'Grind real-life events.', icon: '🏆' },
 ]
 
-/** Title for a given level. */
+/** One Piece-themed rank ladder. Logical progression, not a flat label. */
 export function titleForLevel(level: number): string {
-  if (level >= 20) return 'Yonko'
-  if (level >= 15) return 'Warlord'
-  if (level >= 10) return 'Supernova'
-  if (level >= 5) return 'Grand Line Rookie'
+  if (level >= 30) return 'Pirate King'
+  if (level >= 25) return 'Yonko'
+  if (level >= 20) return 'Yonko Commander'
+  if (level >= 16) return 'Warlord'
+  if (level >= 12) return 'Supernova'
+  if (level >= 8) return 'Grand Line Pirate'
+  if (level >= 5) return 'Paradise Rookie'
+  if (level >= 3) return 'East Blue Pirate'
   return 'East Blue Rookie'
 }
 
-/** Simple level curve: 100 XP per level. */
-export function levelForXp(xp: number): number {
-  return Math.floor(xp / 100) + 1
+/**
+ * Progressive level curve. Cumulative XP required to REACH a level follows
+ * 30·(L−1)·L, so early levels come fast (L2 = 60, L3 = 180, L4 = 360) and each
+ * tier costs progressively more — standard, satisfying RPG pacing rather than a
+ * flat 100/level slog that leaves casual players stuck at Lv 1.
+ */
+export function xpForLevel(level: number): number {
+  if (level <= 1) return 0
+  return 30 * (level - 1) * level
 }
+
+export function levelForXp(xp: number): number {
+  let level = 1
+  while (xp >= xpForLevel(level + 1)) level++
+  return level
+}
+
+/** Level + progress within it, for the XP bar. */
+export function levelProgress(xp: number): {
+  level: number
+  into: number
+  span: number
+  pct: number
+} {
+  const level = levelForXp(xp)
+  const base = xpForLevel(level)
+  const span = xpForLevel(level + 1) - base
+  const into = xp - base
+  return { level, into, span, pct: span > 0 ? Math.round((into / span) * 100) : 0 }
+}
+
+/** XP earned into the current level (legacy helper kept for callers). */
 export function xpIntoLevel(xp: number): number {
-  return xp % 100
+  return levelProgress(xp).into
 }
 
 interface ProgressContextValue extends ProgressState {
@@ -129,6 +168,14 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(KEY, JSON.stringify(next))
     return next
   }, [])
+
+  // One-time welcome bonus: a fresh player lands as Lv 1 with a partially-filled
+  // bar (40/60) instead of a dead 0/100 — so progression feels alive from login.
+  useEffect(() => {
+    setState((s) =>
+      s.onboarded ? s : persist({ ...s, onboarded: true, xp: s.xp + WELCOME_XP }),
+    )
+  }, [persist])
 
   const addXp = useCallback(
     (amount: number) => setState((s) => persist({ ...s, xp: s.xp + amount })),

@@ -30,8 +30,8 @@ export function Settings() {
             onChange={(v) => setSettings({ allowRemoteImages: v })}
           />
           <ToggleRow
-            label="Show OP16 reference cards"
-            hint="The full real OP16 “The Time of Battle” set (119 cards) for browsing & sealed practice. Turn off to see only cards you own."
+            label="Show all reference cards"
+            hint="The full real card pool — every set OP01–OP16 plus EB / PRB / ST (2,400+ cards) for browsing & sealed practice. Turn off to see only cards you own."
             checked={settings.showDemoCards}
             onChange={(v) => setSettings({ showDemoCards: v })}
           />
@@ -243,7 +243,7 @@ function ApitcgImport() {
       if (!cards.length) {
         setStatus('error')
         setMessage(
-          `No cards found for "${setCode.toUpperCase()}". apitcg may not have this set yet (it lags newer releases — OP14–OP16 aren’t in it; OP16 is already built in).`,
+          `No cards found for "${setCode.toUpperCase()}". apitcg may not have this set yet (it lags newer releases). All sets OP01–OP16 + EB/PRB/ST are already built in, so this is optional.`,
         )
         return
       }
@@ -289,8 +289,8 @@ function ApitcgImport() {
             apitcg.com
           </a>
           . Your key is stored only on this device. Uses ~25 paged requests for the whole
-          catalogue (free tier = 1,000 requests/month). OP16 is already built in; apitcg
-          covers up to ~OP13 plus EB/ST sets.
+          catalogue (free tier = 1,000 requests/month). Optional — every set OP01–OP16 plus
+          EB / PRB / ST is already built in; use this only to pull a fresh copy of a set.
         </p>
 
         <label className="block">

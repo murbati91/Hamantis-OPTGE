@@ -1,0 +1,82 @@
+name: Weekly card sync
+
+# Keeps onepiecetcggcc.com current: every Monday (and on-demand) it re-scrapes
+# the full card pool from Limitless, commits any changes back to the repo, then
+# rebuilds and deploys to prod-01. New sets (OP17+) get picked up automatically.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Mondays 04:00 UTC
+  workflow_dispatch: {} # manual "Run workflow" button
+
+concurrency:
+  group: card-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Discover sets + scrape
+        run: |
+          set -euo pipefail
+          SETS=$(node scripts/scrape-limitless.mjs --sets | tr '\n' ' ')
+          echo "Discovered sets: $SETS"
+          node scripts/scrape-limitless.mjs $SETS
+
+      - name: Commit data changes (if any)
+        id: commit
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain src/data/sets)" ]; then
+            git config user.name  "card-sync-bot"
+            git config user.email "actions@users.noreply.github.com"
+            git add src/data/sets
+            git commit -m "chore(data): weekly card-set sync"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No card changes this run."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: pnpm build
+
+      - name: Load deploy key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Deploy to prod-01
+        env:
+          HOST: ${{ secrets.PROD_SSH_HOST }}
+          USER: ${{ secrets.PROD_SSH_USER }}
+          DEST: ${{ secrets.PROD_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          STAMP=$(date +%Y%m%d-%H%M%S)
+          # staged swap: upload to -new, verify, promote, keep one rollback
+          rsync -az --delete dist/ "$USER@$HOST:$DEST-new/"
+          ssh "$USER@$HOST" "test -f '$DEST-new/index.html' && ls '$DEST-new'/assets/index-*.js >/dev/null \
+            && mv '$DEST' '$DEST-old-$STAMP' && mv '$DEST-new' '$DEST' \
+            && curl -sf -H 'Host: onepiecetcggcc.com' http://127.0.0.1/ -o /dev/null \
+            && echo DEPLOY_OK"

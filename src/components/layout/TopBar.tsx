@@ -3,13 +3,15 @@ import { UserButton } from '@clerk/clerk-react'
 import { NAV_ITEMS } from './nav'
 import { OfflineBadge } from '../pwa/OfflineBadge'
 import { Logo } from '../ui/Logo'
-import { useProgress, levelForXp } from '../../store/useProgress'
+import { LanguageToggle } from '../ui/LanguageToggle'
+import { useProgress, levelForXp, levelProgress } from '../../store/useProgress'
 import { CLERK_APPEARANCE } from '../auth/AuthLanding'
 
 export function TopBar() {
   const { pathname } = useLocation()
   const { xp, title } = useProgress()
   const level = levelForXp(xp)
+  const prog = levelProgress(xp)
   const current =
     NAV_ITEMS.find((i) => (i.to === '/' ? pathname === '/' : pathname.startsWith(i.to)))
       ?.label ?? 'One Piece TCG'
@@ -22,9 +24,18 @@ export function TopBar() {
         <OfflineBadge />
       </div>
       <div className="flex items-center gap-2 text-right">
+        <LanguageToggle />
         <div className="hidden text-xs text-slate-400 sm:block">{title}</div>
-        <div className="rounded-full bg-mantis-800/60 px-2.5 py-1 text-xs font-bold text-mantis-200">
-          Lv {level}
+        <div
+          className="flex flex-col items-center gap-0.5"
+          title={`${title} · ${prog.into}/${prog.span} XP to Level ${level + 1}`}
+        >
+          <div className="rounded-full bg-mantis-800/60 px-2.5 py-1 text-xs font-bold text-mantis-200">
+            Lv {level}
+          </div>
+          <div className="h-1 w-12 overflow-hidden rounded-full bg-ink-850">
+            <div className="h-full rounded-full bg-mantis-400" style={{ width: `${prog.pct}%` }} />
+          </div>
         </div>
         <UserButton afterSignOutUrl="/" appearance={CLERK_APPEARANCE} />
       </div>

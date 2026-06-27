@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCollection } from '../store/useCollection'
 import { useProgress } from '../store/useProgress'
 import { CardFace } from '../components/ui/CardFace'
+import { CardTooltip } from '../components/ui/CardTooltip'
 import { HeadToHead, type ClashView } from '../features/play/HeadToHead'
 import { Tutorial } from '../features/play/Tutorial'
 import { initGame, apply, def, effPower, opp } from '../features/play/engine'
@@ -423,15 +424,16 @@ export function Play() {
             const d = def(game, id)
             const playable = yourTurn && game.phase === 'main' && d.type === 'Character' && d.cost <= you.donAvailable
             return (
-              <button
-                key={id + i}
-                onClick={() => playable && act({ t: 'play', cardId: id })}
-                disabled={!playable}
-                className={`w-16 shrink-0 rounded-lg ring-1 transition ${playable ? 'ring-mantis-500 hover:-translate-y-1' : 'opacity-70 ring-slate-800'}`}
-                title={d.name}
-              >
-                <CardFace card={resolveCard(id)} size="sm" />
-              </button>
+              <CardTooltip key={id + i} card={resolveCard(id)} className="w-16 shrink-0">
+                <button
+                  onClick={() => playable && act({ t: 'play', cardId: id })}
+                  disabled={!playable}
+                  className={`w-full rounded-lg ring-1 transition ${playable ? 'ring-mantis-500 hover:-translate-y-1' : 'opacity-70 ring-slate-800'}`}
+                  title={d.name}
+                >
+                  <CardFace card={resolveCard(id)} size="sm" />
+                </button>
+              </CardTooltip>
             )
           })}
         </div>
@@ -602,25 +604,28 @@ function PlayerStrip({
       </div>
       <div className="flex items-end gap-2 overflow-x-auto pb-1">
         {/* leader */}
-        <button
-          onClick={() => (enemy ? onTarget?.('leader') : onCard?.('leader', p.leaderRested, false))}
-          className={`w-16 shrink-0 rounded-lg ring-2 ${selected === 'leader' ? 'ring-straw-400' : enemy && targetable ? 'ring-rose-500 animate-pulse' : 'ring-mantis-700/60'} ${p.leaderRested || ownInactive(p.leaderRested, false) ? 'opacity-50' : ''}`}
-          title="Leader"
-        >
-          <CardFace card={leaderCard} power={effPower(g, side, 'leader')} size="sm" />
-        </button>
+        <CardTooltip card={leaderCard} className="w-16 shrink-0">
+          <button
+            onClick={() => (enemy ? onTarget?.('leader') : onCard?.('leader', p.leaderRested, false))}
+            className={`w-full rounded-lg ring-2 ${selected === 'leader' ? 'ring-straw-400' : enemy && targetable ? 'ring-rose-500 animate-pulse' : 'ring-mantis-700/60'} ${p.leaderRested || ownInactive(p.leaderRested, false) ? 'opacity-50' : ''}`}
+            title="Leader"
+          >
+            <CardFace card={leaderCard} power={effPower(g, side, 'leader')} size="sm" />
+          </button>
+        </CardTooltip>
         {/* characters */}
         {p.board.map((c) => {
           const targetableChar = enemy && targetable && c.rested
           return (
-            <button
-              key={c.uid}
-              onClick={() => (enemy ? c.rested && onTarget?.(c.uid) : onCard?.(c.uid, c.rested, c.playedThisTurn))}
-              className={`w-14 shrink-0 rounded-lg ring-1 ${selected === c.uid ? 'ring-2 ring-straw-400' : targetableChar ? 'ring-2 ring-rose-500 animate-pulse' : 'ring-slate-700'} ${c.rested || ownInactive(c.rested, c.playedThisTurn) ? 'opacity-50' : ''}`}
-              title={def(g, c.cardId).name}
-            >
-              <CardFace card={resolve(c.cardId)} power={def(g, c.cardId).power + c.attachedDon * 1000} size="xs" />
-            </button>
+            <CardTooltip key={c.uid} card={resolve(c.cardId)} className="w-14 shrink-0">
+              <button
+                onClick={() => (enemy ? c.rested && onTarget?.(c.uid) : onCard?.(c.uid, c.rested, c.playedThisTurn))}
+                className={`w-full rounded-lg ring-1 ${selected === c.uid ? 'ring-2 ring-straw-400' : targetableChar ? 'ring-2 ring-rose-500 animate-pulse' : 'ring-slate-700'} ${c.rested || ownInactive(c.rested, c.playedThisTurn) ? 'opacity-50' : ''}`}
+                title={def(g, c.cardId).name}
+              >
+                <CardFace card={resolve(c.cardId)} power={def(g, c.cardId).power + c.attachedDon * 1000} size="xs" />
+              </button>
+            </CardTooltip>
           )
         })}
         {p.board.length === 0 && <span className="py-6 text-[0.65rem] text-slate-600">no characters</span>}
@@ -663,13 +668,13 @@ function DefenseModal({
 
         {/* attacker vs defender preview */}
         <div className="mt-3 flex items-center justify-center gap-3">
-          <div className="w-16">
+          <CardTooltip card={attackerCard} className="w-16">
             <CardFace card={attackerCard} power={pd.baseAttackPower} size="sm" />
-          </div>
+          </CardTooltip>
           <span className="text-lg" aria-hidden="true">⚔️</span>
-          <div className="w-16">
+          <CardTooltip card={targetCard} className="w-16">
             <CardFace card={targetCard} power={targetPow} size="sm" />
-          </div>
+          </CardTooltip>
         </div>
 
         <p className="mt-2 text-center text-xs text-slate-300">
@@ -681,16 +686,17 @@ function DefenseModal({
             <div className="text-xs text-slate-400">Block (redirect to a Blocker):</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {blockers.map((c) => (
-                <button
-                  key={c.uid}
-                  onClick={() => onAct({ t: 'block', blockerUid: c.uid })}
-                  className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                >
-                  <span className="w-7 shrink-0">
-                    <CardFace card={resolve(c.cardId)} size="xs" />
-                  </span>
-                  🛡 {def(g, c.cardId).name}
-                </button>
+                <CardTooltip key={c.uid} card={resolve(c.cardId)}>
+                  <button
+                    onClick={() => onAct({ t: 'block', blockerUid: c.uid })}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  >
+                    <span className="w-7 shrink-0">
+                      <CardFace card={resolve(c.cardId)} size="xs" />
+                    </span>
+                    🛡 {def(g, c.cardId).name}
+                  </button>
+                </CardTooltip>
               ))}
             </div>
           </div>
@@ -700,16 +706,17 @@ function DefenseModal({
             <div className="text-xs text-slate-400">Counter from hand (+power):</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {counters.map((id, i) => (
-                <button
-                  key={id + i}
-                  onClick={() => onAct({ t: 'counter', cardId: id })}
-                  className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                >
-                  <span className="w-7 shrink-0">
-                    <CardFace card={resolve(id)} size="xs" />
-                  </span>
-                  +{def(g, id).counter} {def(g, id).name}
-                </button>
+                <CardTooltip key={id + i} card={resolve(id)}>
+                  <button
+                    onClick={() => onAct({ t: 'counter', cardId: id })}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  >
+                    <span className="w-7 shrink-0">
+                      <CardFace card={resolve(id)} size="xs" />
+                    </span>
+                    +{def(g, id).counter} {def(g, id).name}
+                  </button>
+                </CardTooltip>
               ))}
             </div>
           </div>

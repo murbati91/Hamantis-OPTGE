@@ -87,12 +87,22 @@ function parseCard(code, html) {
   const lifeRaw = num(text, /(\d+)\s*Life/i)
   const costRaw = num(text, /(\d+)\s*Cost/i)
 
-  // Type: explicit type word in the small stat-block header window; else infer
-  // from which stats exist (Life ⇒ Leader; Cost-but-no-Power ⇒ Event/Stage).
+  // Type: most reliable signal is the word on the line right AFTER the card
+  // code — Limitless lists "<name> / <code> / <TYPE> / • / <color> / • N Cost".
+  // (Anchoring on the stat block missed Stages — they have Cost-but-no-Power
+  // like Events, so inference mislabeled every Stage as Event/Character.)
   let type = null
+  const idIdx = ls.findIndex((l) => l === code)
+  if (idIdx >= 0) {
+    for (let i = idIdx + 1; i < ls.length && i <= idIdx + 5; i++) {
+      if (TYPES.includes(ls[i])) { type = ls[i]; break }
+    }
+  }
   const anchor = statIdx >= 0 ? statIdx : 0
-  for (let i = anchor; i >= 0 && i > anchor - 10; i--) {
-    if (TYPES.includes(ls[i])) { type = ls[i]; break }
+  if (!type) {
+    for (let i = anchor; i >= 0 && i > anchor - 10; i--) {
+      if (TYPES.includes(ls[i])) { type = ls[i]; break }
+    }
   }
   if (!type) {
     if (lifeRaw != null) type = 'Leader'

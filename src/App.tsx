@@ -6,6 +6,7 @@ import { ProgressProvider } from './store/useProgress'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthLanding, CLERK_APPEARANCE } from './components/auth/AuthLanding'
 import { Logo } from './components/ui/Logo'
+import { LanguageProvider } from './i18n/LanguageContext'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
 
@@ -29,23 +30,25 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <ClerkProvider
-        publishableKey={PUBLISHABLE_KEY}
-        afterSignOutUrl="/"
-        appearance={CLERK_APPEARANCE}
-      >
-        {/* Sign-up / sign-in is REQUIRED — nothing renders until the user is authed. */}
-        <SignedOut>
-          <AuthLanding />
-        </SignedOut>
-        <SignedIn>
-          <ProgressProvider>
-            <CollectionProvider>
-              <RouterProvider router={router} />
-            </CollectionProvider>
-          </ProgressProvider>
-        </SignedIn>
-      </ClerkProvider>
+      <LanguageProvider>
+        <ClerkProvider
+          publishableKey={PUBLISHABLE_KEY}
+          afterSignOutUrl="/"
+          appearance={CLERK_APPEARANCE}
+        >
+          {/* Sign-up / sign-in is REQUIRED — nothing renders until the user is authed. */}
+          <SignedOut>
+            <AuthLanding />
+          </SignedOut>
+          <SignedIn>
+            <ProgressProvider>
+              <CollectionProvider>
+                <RouterProvider router={router} />
+              </CollectionProvider>
+            </ProgressProvider>
+          </SignedIn>
+        </ClerkProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   )
 }

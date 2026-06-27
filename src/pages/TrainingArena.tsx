@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useProgress, BADGES, xpIntoLevel } from '../store/useProgress'
+import { useProgress, BADGES, levelProgress } from '../store/useProgress'
 import {
   QUIZ_BANK,
   MULLIGAN_BANK,
@@ -33,7 +33,7 @@ export function TrainingArena() {
             <div className="text-sm text-mantis-300">{title}</div>
             <div className="text-2xl font-bold text-mantis-100">Level {level}</div>
             <div className="mt-1 text-xs text-slate-400">
-              {xp} XP · {xpIntoLevel(xp)}/100 to next
+              {xp} XP · {levelProgress(xp).into}/{levelProgress(xp).span} to next
             </div>
           </div>
           <div className="text-4xl">🎯</div>
@@ -41,7 +41,7 @@ export function TrainingArena() {
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-ink-950">
           <div
             className="h-full rounded-full bg-mantis-500 transition-all"
-            style={{ width: `${xpIntoLevel(xp)}%` }}
+            style={{ width: `${levelProgress(xp).pct}%` }}
           />
         </div>
       </section>

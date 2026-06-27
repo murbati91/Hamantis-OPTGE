@@ -12,6 +12,7 @@ import { MatchTracker } from './pages/MatchTracker'
 import { Tournament } from './pages/Tournament'
 import { Glossary } from './pages/Glossary'
 import { Play } from './pages/Play'
+import { PlayGuide } from './pages/PlayGuide'
 import { Link } from 'react-router-dom'
 
 function NotFound() {
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
       { path: 'tournament', element: <Tournament /> },
       { path: 'play', element: <Play /> },
       { path: 'glossary', element: <Glossary /> },
+      { path: 'play-guide', element: <PlayGuide /> },
       { path: 'settings', element: <Settings /> },
       { path: '*', element: <NotFound /> },
     ],

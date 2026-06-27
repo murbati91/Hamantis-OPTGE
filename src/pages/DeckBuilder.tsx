@@ -4,6 +4,7 @@ import { useProgress } from '../store/useProgress'
 import { generateSealedPool } from '../features/sealed/poolGenerator'
 import { analyzeDeck, DECK_TARGET_SIZE, deckSize } from '../features/sealed/deckEngine'
 import { CardFace } from '../components/ui/CardFace'
+import { CardTooltip } from '../components/ui/CardTooltip'
 import { RatingPill } from '../components/ui/RatingPill'
 import { ColorDot } from '../components/ui/Badge'
 import type { Card, Deck, PoolCard, SealedPool, TargetStatus } from '../types'
@@ -190,7 +191,9 @@ export function DeckBuilder() {
                         : 'border-slate-800 bg-ink-850/50 hover:border-mantis-700/60'
                     }`}
                   >
-                    <CardFace card={l} size="md" />
+                    <CardTooltip card={l} className="w-full">
+                      <CardFace card={l} size="md" />
+                    </CardTooltip>
                     <div className="mt-2 line-clamp-1 text-sm font-medium text-slate-100">
                       {l.name}
                     </div>
@@ -282,7 +285,7 @@ export function DeckBuilder() {
                     key={g.cardId}
                     className="rounded-xl border border-slate-800 bg-ink-850/50 p-2"
                   >
-                    <div className="relative">
+                    <CardTooltip card={g.card} className="relative w-full">
                       <CardFace card={g.card} size="sm" />
                       <span className="absolute right-1 top-1">
                         <RatingPill rating={g.card.sealedRating} />
@@ -292,7 +295,7 @@ export function DeckBuilder() {
                           ×{inDeck}
                         </span>
                       )}
-                    </div>
+                    </CardTooltip>
                     <div className="mt-2 line-clamp-1 text-sm font-medium text-slate-100">
                       {g.card.name}
                     </div>

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useCollection } from '../store/useCollection'
-import { useProgress, xpIntoLevel } from '../store/useProgress'
+import { useProgress, levelProgress } from '../store/useProgress'
 import { StatCard } from '../components/ui/StatCard'
 import { RatingPill } from '../components/ui/RatingPill'
 import { is2kCounter, isBlocker, isRemoval } from '../lib/cards'
@@ -10,6 +10,7 @@ import type { CardColor } from '../types'
 export function Dashboard() {
   const { entries, cardIndex, settings, decks, matches } = useCollection()
   const { xp, level, title, badges } = useProgress()
+  const prog = levelProgress(xp)
 
   const wins = matches.filter((m) => m.result === 'win').length
   const losses = matches.filter((m) => m.result === 'loss').length
@@ -54,12 +55,12 @@ export function Dashboard() {
           <div className="h-2 w-full overflow-hidden rounded-full bg-ink-950">
             <div
               className="h-full rounded-full bg-mantis-400 transition-all"
-              style={{ width: `${xpIntoLevel(xp)}%` }}
+              style={{ width: `${prog.pct}%` }}
             />
           </div>
           <div className="mt-1 flex justify-between text-xs text-slate-400">
             <span>{xp} XP total</span>
-            <span>{xpIntoLevel(xp)}/100 to next level</span>
+            <span>{prog.into}/{prog.span} to Level {level + 1}</span>
           </div>
         </div>
       </section>

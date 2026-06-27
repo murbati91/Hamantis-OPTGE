@@ -2,6 +2,7 @@ import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 're
 import { Link } from 'react-router-dom'
 import { useCollection } from '../store/useCollection'
 import { CardFace } from '../components/ui/CardFace'
+import { CardTooltip } from '../components/ui/CardTooltip'
 import { RatingPill } from '../components/ui/RatingPill'
 import { is2kCounter, isBlocker, isRemoval } from '../lib/cards'
 import { InfoTip } from '../components/ui/InfoTip'
@@ -199,8 +200,9 @@ const WalletCard = memo(function WalletCard({
   const owned = quantity > 0
   return (
     <Link to={`/card/${card.id}`} title={card.name} className="group relative block">
+      <CardTooltip card={card} className="w-full">
       <div
-        className={`relative overflow-hidden rounded-xl transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_12px_32px_-12px_rgba(220,38,38,0.55)] ${
+        className={`relative w-full overflow-hidden rounded-xl transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_12px_32px_-12px_rgba(220,38,38,0.55)] ${
           owned
             ? 'ring-2 ring-straw-400/70'
             : 'ring-1 ring-slate-800 group-hover:ring-mantis-500/70'
@@ -227,6 +229,7 @@ const WalletCard = memo(function WalletCard({
           </span>
         )}
       </div>
+      </CardTooltip>
     </Link>
   )
 })

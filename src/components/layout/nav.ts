@@ -16,6 +16,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/matches', label: 'Matches', icon: '⚔️' },
   { to: '/tournament', label: 'Tournament', icon: '🏆' },
   { to: '/glossary', label: 'Glossary', icon: '📖' },
+  { to: '/play-guide', label: 'Play Guide', icon: '📘', primary: true },
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
