@@ -16,7 +16,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/ai-deck', label: 'AI Deck', icon: '🤖' },
   { to: '/matches', label: 'Matches', icon: '⚔️' },
   { to: '/tournament', label: 'Tournament', icon: '🏆' },
-  { to: '/glossary', label: 'Glossary', icon: '📖' },
+  // Glossary is reachable from the Play Guide, so it's kept out of the main nav.
   { to: '/play-guide', label: 'Play Guide', icon: '📘', primary: true },
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ]

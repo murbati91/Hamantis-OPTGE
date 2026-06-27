@@ -145,31 +145,34 @@ export function buildDeck(req: BuildRequest): BuildResult {
     .map((c) => ({ c, score: scoreCard(c, leader!, aggr) }))
     .sort((a, b) => b.score - a.score || a.c.id.localeCompare(b.c.id))
 
-  // Fill the curve bucket-by-bucket, capping at 4 copies/card.
+  // Tiered, curve-aware fill so the result reads like a real decklist rather
+  // than a handful of 4-ofs: the top STAPLES cards run 4 copies (consistency),
+  // everything after runs 2 (role-players) — all kept within the cost curve.
   const target = CURVES[aggr]
   const deck: Record<string, number> = {}
   const bucketFilled: Record<number, number> = {}
   let total = 0
+  let staples = 0
+  const STAPLES = 6
 
   const bucketOf = (cost: number) => (cost >= 7 ? 7 : cost <= 1 ? 1 : cost)
 
-  const tryAdd = (bucket: number, want: number) => {
-    for (const { c } of candidates) {
-      if (total >= DECK_SIZE) return
-      if ((bucketFilled[bucket] ?? 0) >= want) return
-      if (bucketOf(c.cost ?? 0) !== bucket) continue
-      const cur = deck[c.id] ?? 0
-      if (cur >= MAX_COPIES) continue
-      const room = Math.min(MAX_COPIES - cur, want - (bucketFilled[bucket] ?? 0), DECK_SIZE - total)
-      if (room <= 0) continue
-      deck[c.id] = cur + room
-      bucketFilled[bucket] = (bucketFilled[bucket] ?? 0) + room
-      total += room
-    }
+  for (const { c } of candidates) {
+    if (total >= DECK_SIZE) break
+    const b = bucketOf(c.cost ?? 0)
+    const cap = target[b] ?? 0
+    const filled = bucketFilled[b] ?? 0
+    if (filled >= cap) continue // bucket already meets its curve target
+    const want = staples < STAPLES ? MAX_COPIES : 2
+    const room = Math.min(want, MAX_COPIES, cap - filled, DECK_SIZE - total)
+    if (room <= 0) continue
+    deck[c.id] = room
+    bucketFilled[b] = filled + room
+    total += room
+    staples++
   }
 
-  for (const [bucketStr, want] of Object.entries(target)) tryAdd(Number(bucketStr), want)
-  // Top up any shortfall with the best remaining cards (curve spillover).
+  // Top up any shortfall (singletons of the best remaining cards, ≤4 copies).
   if (total < DECK_SIZE) {
     for (const { c } of candidates) {
       if (total >= DECK_SIZE) break
