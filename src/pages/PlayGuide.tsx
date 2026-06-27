@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { CardFace } from '../components/ui/CardFace'
+import { PlaymatDiagram, SetupFlow } from '../components/PlayGuideDiagrams'
 import { useLanguage } from '../i18n/LanguageContext'
 import { PLAY_GUIDE as G } from '../i18n/playGuide'
 
@@ -112,12 +113,9 @@ export function PlayGuide() {
       {/* Playmat */}
       <section className="rounded-2xl border border-slate-800 bg-ink-900/60 p-5">
         <SectionTitle>{tr(G.seat.title)}</SectionTitle>
-        <img
-          src={`${IMG}/img_play-seat.webp`}
-          alt={tr(G.seat.title)}
-          loading="lazy"
-          className="mb-5 w-full rounded-xl border border-slate-800"
-        />
+        <div className="mb-5">
+          <PlaymatDiagram zones={G.seat.zones.map((z) => ({ n: z.n, label: tr(z.term) }))} />
+        </div>
         <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           {G.seat.zones.map((z) => (
             <div key={z.n} className="flex gap-3">
@@ -136,12 +134,9 @@ export function PlayGuide() {
       {/* How to start */}
       <section className="rounded-2xl border border-slate-800 bg-ink-900/60 p-5">
         <SectionTitle>{tr(G.start.title)}</SectionTitle>
-        <img
-          src={`${IMG}/img_how-to-play.webp`}
-          alt={tr(G.start.title)}
-          loading="lazy"
-          className="mb-5 w-full rounded-xl border border-slate-800"
-        />
+        <div className="mb-5">
+          <SetupFlow steps={G.start.flow.map((f) => ({ icon: f.icon, label: tr(f.label) }))} />
+        </div>
         <ol className="space-y-3">
           {G.start.steps.map((s, i) => (
             <li key={i} className="flex gap-3 rounded-xl bg-ink-850 p-3">

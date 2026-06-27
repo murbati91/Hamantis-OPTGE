@@ -129,6 +129,14 @@ export const PLAY_GUIDE = {
   // --- Section: How to start ---
   start: {
     title: bi('How to Start a Game', 'كيفية بدء اللعبة'),
+    // Short captions for the custom setup-flow diagram (one per step).
+    flow: [
+      { icon: '🃏', label: bi('Set up', 'التجهيز') },
+      { icon: '✊', label: bi('Decide turn', 'تحديد الدور') },
+      { icon: '🖐️', label: bi('Draw 5', 'اسحب 5') },
+      { icon: '🛡️', label: bi('Set Life', 'ضع الحياة') },
+      { icon: '🚩', label: bi('Begin', 'ابدأ') },
+    ],
     steps: [
       { body: bi('Shuffle your deck and place your Leader card, Deck, and DON!! deck in their zones. Your Leader card is placed face-up.', 'اخلط مجموعتك وضع بطاقة القائد والمجموعة ومجموعة دون!! في مناطقها. توضع بطاقة القائد ووجهها لأعلى.') },
       { body: bi('Do rock-paper-scissors to decide who goes first. The winner chooses to go first or second.', 'العبوا حجر-ورقة-مقص لتحديد من يبدأ. يختار الفائز اللعب أولاً أو ثانياً.') },
