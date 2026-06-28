@@ -2,6 +2,7 @@ import type { Card, Deck } from '../../types'
 import { isBlocker as deriveBlocker } from '../../lib/cards'
 import { TRAINING_LEADERS, TRAINING_NONLEADERS } from '../../data/trainingSet'
 import type { Action, CardDef, GameState, PlayerState, Side } from './types'
+import * as flavor from './flavor'
 
 const DON_CAP = 10
 const HAND_START = 5
@@ -164,7 +165,7 @@ function startTurn(s: GameState, side: Side) {
     if (p.deck.length === 0) {
       s.winner = opp(side) // deck-out
       s.phase = 'gameover'
-      s.log.push('Deck-out — ' + (side === 0 ? 'you lose' : 'you win') + '.')
+      flog(s, flavor.onDeckOut(side !== 0))
       return
     }
     p.hand.push(p.deck.shift() as string)
@@ -175,10 +176,13 @@ function startTurn(s: GameState, side: Side) {
   s.phase = 'main'
 }
 
-function log(s: GameState, side: Side, msg: string) {
-  s.log.push((side === 0 ? 'You' : 'Bot') + ' ' + msg)
+/** Push a pre-formatted (comic-book) line. Seed varies per event for variety. */
+function flog(s: GameState, msg: string) {
+  s.log.push(msg)
   if (s.log.length > 40) s.log.shift()
 }
+/** Deterministic per-event seed (no Math.random — keeps the reducer pure). */
+const seedOf = (s: GameState) => s.log.length + s.turn * 7
 
 // ---- the reducer ----
 
@@ -195,7 +199,7 @@ export function apply(state: GameState, action: Action): GameState {
       if (ch && !ch.rested && def(s, ch.cardId).isBlocker && s.pending.blockerUid === null) {
         ch.rested = true
         s.pending.blockerUid = ch.uid
-        log(s, def_side, 'blocks with ' + def(s, ch.cardId).name + '.')
+        flog(s, flavor.onBlock(def(s, ch.cardId).name, def_side === 0, seedOf(s)))
       }
       return s
     }
@@ -207,6 +211,9 @@ export function apply(state: GameState, action: Action): GameState {
         dp.trash.push(action.cardId)
         s.pending.counterAdded += cdef.counter
         s.pending.counterCardsUsed.push(action.cardId)
+        const tgt = s.pending.blockerUid ?? s.pending.target
+        const base = tgt === 'leader' ? effPower(s, def_side, 'leader') : effPower(s, def_side, tgt)
+        flog(s, flavor.onCounter(cdef.name, cdef.counter, base + s.pending.counterAdded, def_side === 0, seedOf(s)))
       }
       return s
     }
@@ -229,7 +236,7 @@ export function apply(state: GameState, action: Action): GameState {
       p.hand.splice(idx, 1)
       p.donAvailable -= d.cost
       p.board.push({ uid: `u${s.nextUid++}`, cardId: action.cardId, rested: false, attachedDon: 0, playedThisTurn: true })
-      log(s, me, 'plays ' + d.name + '.')
+      flog(s, flavor.onPlay(d.name, me === 0, seedOf(s)))
       return s
     }
     case 'attachDon': {
@@ -274,7 +281,14 @@ export function apply(state: GameState, action: Action): GameState {
         counterAdded: 0,
         counterCardsUsed: [],
       }
-      log(s, me, 'attacks ' + (action.target === 'leader' ? 'the Leader' : 'a character') + '.')
+      const attackerName =
+        action.attacker === 'leader'
+          ? def(s, p.leaderId).name
+          : def(s, p.board.find((c) => c.uid === action.attacker)?.cardId ?? '').name
+      let targetPhrase: string
+      if (action.target === 'leader') targetPhrase = me === 0 ? "the bot's Leader" : 'your Leader'
+      else targetPhrase = def(s, od.board.find((c) => c.uid === action.target)?.cardId ?? '').name
+      flog(s, flavor.onAttack(attackerName, targetPhrase, me === 0, seedOf(s)))
       return s
     }
     case 'endTurn': {
@@ -310,22 +324,23 @@ function resolveDefense(s: GameState) {
       if (dp.life > 0) {
         dp.life--
         if (dp.deck.length) dp.hand.push(dp.deck.shift() as string) // life-card-to-hand (trigger-lite)
-        log(s, atkSide, 'deals 1 damage. ' + (defSide === 0 ? 'You have' : 'Bot has') + ' ' + dp.life + ' life left.')
+        flog(s, flavor.onDamage(atkSide === 0, defSide === 0, dp.life, seedOf(s)))
       } else {
         s.winner = atkSide
         s.phase = 'gameover'
-        s.log.push(atkSide === 0 ? 'You win! 🏴‍☠️' : 'Bot wins.')
+        flog(s, flavor.onWin(atkSide === 0))
       }
     } else {
       const i = dp.board.findIndex((c) => c.uid === target)
       if (i >= 0) {
         const ko = dp.board.splice(i, 1)[0]
         dp.trash.push(ko.cardId)
-        log(s, atkSide, 'K.O.s ' + def(s, ko.cardId).name + '.')
+        flog(s, flavor.onKO(def(s, ko.cardId).name, atkSide === 0, seedOf(s)))
       }
     }
   } else {
-    log(s, defSide, 'survives the attack.')
+    const defName = target === 'leader' ? (defSide === 0 ? 'Your Leader' : "The bot's Leader") : def(s, dp.board.find((c) => c.uid === target)?.cardId ?? '').name
+    flog(s, flavor.onSurvive(defName, pd.baseAttackPower, targetPower, defSide === 0, seedOf(s)))
   }
   s.pending = null
 }
