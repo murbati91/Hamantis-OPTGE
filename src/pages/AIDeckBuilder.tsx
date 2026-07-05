@@ -232,7 +232,7 @@ function DeckList({ deck, index }: { deck: Record<string, number>; index: Record
         {groups.map(({ card, count }) => (
           <div key={card.id} className="relative">
             <CardFace card={card} size="sm" />
-            <span className="absolute right-1 top-1 rounded-full bg-mantis-600 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
+            <span className="absolute -right-1.5 -top-1.5 z-20 rounded-full border-2 border-ink-950 bg-mantis-600 px-1.5 py-0.5 text-[0.65rem] font-bold text-white shadow-md">
               ×{count}
             </span>
           </div>

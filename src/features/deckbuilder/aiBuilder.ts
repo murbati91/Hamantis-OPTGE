@@ -173,14 +173,20 @@ export function buildDeck(req: BuildRequest): BuildResult {
   }
 
   // Top up any shortfall (singletons of the best remaining cards, ≤4 copies).
-  if (total < DECK_SIZE) {
+  // Repeat passes — not just one — until the deck hits DECK_SIZE or every
+  // candidate is maxed out, otherwise a small candidate pool (narrow color
+  // splits, early sets) could silently leave the deck short of 50 cards.
+  while (total < DECK_SIZE) {
+    let addedThisPass = false
     for (const { c } of candidates) {
       if (total >= DECK_SIZE) break
       const cur = deck[c.id] ?? 0
       if (cur >= MAX_COPIES) continue
       deck[c.id] = cur + 1
       total += 1
+      addedThisPass = true
     }
+    if (!addedThisPass) break // candidate pool exhausted at MAX_COPIES each
   }
 
   // Final curve readout.
@@ -206,6 +212,9 @@ export function buildDeck(req: BuildRequest): BuildResult {
       .join('  ')}.`,
     `Defensive layer: ${counters} counter cards, ${removal} removal, ${events} events.`,
     `Max 4 copies per card enforced; cards ranked by efficiency + ${leader.traits?.[0] ?? 'archetype'} synergy.`,
+    ...(total < DECK_SIZE
+      ? [`⚠ Only ${candidates.length} legal cards match this Leader's colors — deck is ${total}/${DECK_SIZE}, short by ${DECK_SIZE - total}.`]
+      : []),
   ]
 
   return { leader, archetype: archetypeName(leader, aggr), aggression: aggr, deck, curve, reasoning }

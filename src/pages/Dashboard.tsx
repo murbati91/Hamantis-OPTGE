@@ -3,6 +3,7 @@ import { useCollection } from '../store/useCollection'
 import { useProgress, levelProgress } from '../store/useProgress'
 import { StatCard } from '../components/ui/StatCard'
 import { RatingPill } from '../components/ui/RatingPill'
+import { CardImage } from '../components/ui/CardImage'
 import { is2kCounter, isBlocker, isRemoval } from '../lib/cards'
 import { Logo } from '../components/ui/Logo'
 import type { CardColor } from '../types'
@@ -160,12 +161,17 @@ OP16 Top Rated (reference)
             <Link
               key={c.id}
               to={`/card/${c.id}`}
-              className="flex items-center justify-between rounded-xl border border-slate-800 bg-ink-850/50 px-4 py-3 hover:border-mantis-700/60"
+              className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-ink-850/50 px-4 py-3 hover:border-mantis-700/60"
             >
-              <div>
-                <div className="font-medium text-slate-100">{c.name}</div>
-                <div className="text-xs text-slate-500">
-                  {c.id} · {c.sealedRole}
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="w-12 shrink-0">
+                  <CardImage card={c} />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-slate-100">{c.name}</div>
+                  <div className="text-xs text-slate-500">
+                    {c.id} · {c.sealedRole}
+                  </div>
                 </div>
               </div>
               <RatingPill rating={c.sealedRating} />

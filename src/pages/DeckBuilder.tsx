@@ -287,11 +287,11 @@ export function DeckBuilder() {
                   >
                     <CardTooltip card={g.card} className="relative w-full">
                       <CardFace card={g.card} size="sm" />
-                      <span className="absolute right-1 top-1">
+                      <span className="absolute -right-1.5 -top-1.5 z-20">
                         <RatingPill rating={g.card.sealedRating} />
                       </span>
                       {inDeck > 0 && (
-                        <span className="absolute left-1 top-1 rounded-full bg-mantis-600 px-2 py-0.5 text-xs font-bold text-white">
+                        <span className="absolute -left-1.5 -top-1.5 z-20 rounded-full border-2 border-ink-950 bg-mantis-600 px-2 py-0.5 text-xs font-bold text-white shadow-md">
                           ×{inDeck}
                         </span>
                       )}

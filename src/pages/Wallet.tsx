@@ -219,7 +219,7 @@ const WalletCard = memo(function WalletCard({
         </div>
 
         {owned && (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-straw-500 px-2 py-0.5 text-[0.7rem] font-bold text-ink-950 shadow-md">
+          <span className="absolute -right-1.5 -top-1.5 z-20 rounded-full border-2 border-ink-950 bg-straw-500 px-2 py-0.5 text-[0.7rem] font-bold text-ink-950 shadow-md">
             ×{quantity}
           </span>
         )}

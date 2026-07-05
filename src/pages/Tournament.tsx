@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useCollection } from '../store/useCollection'
 import { useProgress } from '../store/useProgress'
 import { StatCard } from '../components/ui/StatCard'
+import { VenueCard } from '../components/ui/VenueCard'
+import { BAHRAIN_VENUES } from '../data/venues'
 import type { MatchResult, Tournament as TournamentType, TournamentRound } from '../types'
 
 function todayInputValue(): string {
@@ -209,6 +211,20 @@ export function Tournament() {
             })}
           </div>
         )}
+      </section>
+
+      {/* Bahrain venues & exhibitions */}
+      <section>
+        <h2 className={labelCls}>Bahrain venues & exhibitions</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Community-sourced list of tabletop/TCG-friendly spots — confirm event schedules directly
+          with the venue before showing up.
+        </p>
+        <div className="mt-3 space-y-2">
+          {BAHRAIN_VENUES.map((v) => (
+            <VenueCard key={v.id} venue={v} />
+          ))}
+        </div>
       </section>
 
       {/* Active tournament */}
