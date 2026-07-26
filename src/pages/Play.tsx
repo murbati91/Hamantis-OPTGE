@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCollection } from '../store/useCollection'
 import { useProgress } from '../store/useProgress'
-import { CardFace } from '../components/ui/CardFace'
+import { CardImage } from '../components/ui/CardImage'
 import { CardTooltip } from '../components/ui/CardTooltip'
+import { COLOR_HEX } from '../lib/cards'
 import { HeadToHead, type ClashView } from '../features/play/HeadToHead'
 import { Tutorial } from '../features/play/Tutorial'
 import { initGame, apply, def, effPower, opp } from '../features/play/engine'
@@ -48,6 +49,43 @@ function prefersReducedMotion(): boolean {
 /** cardId of a board character by uid (or '' if it's gone). */
 function charCardId(g: GameState, side: Side, uid: string): string {
   return g.players[side].board.find((c) => c.uid === uid)?.cardId ?? ''
+}
+
+/**
+ * One labeled zone box on the playmat grid (Character Area, Leader, Deck, …).
+ * `className` styles the inner content row/column — direction (flex-row /
+ * flex-col) and alignment are left to the caller since a zone's content
+ * varies (a single centered slot vs. a 5-wide character grid vs. wrapped
+ * DON!! pips), rather than baking in a default that fights per-zone needs.
+ */
+function ZoneBox({ label, className = '', children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex h-full flex-col rounded-lg border border-white/15 bg-black/10 p-1">
+      <div className="shrink-0 truncate text-center text-[0.5rem] font-bold uppercase tracking-wide text-white/40">{label}</div>
+      <div className={`flex min-h-0 flex-1 ${className}`}>{children}</div>
+    </div>
+  )
+}
+
+/**
+ * Real card art for the board, with an optional floating badge showing the
+ * card's *current effective* power — buffs/DON attachments change this away
+ * from the printed value on the scan, so combat math still needs it overlaid.
+ */
+function BoardCard({ card, power, className }: { card?: Card; power?: number; className?: string }) {
+  if (!card) {
+    return <div className={`aspect-[5/7] w-full rounded-lg bg-ink-850 ${className ?? ''}`} />
+  }
+  return (
+    <div className={`relative ${className ?? ''}`}>
+      <CardImage card={card} />
+      {power != null && (
+        <span className="absolute -left-1.5 -top-1.5 z-20 rounded-full border-2 border-ink-950 bg-rose-600 px-1.5 py-0.5 text-[0.65rem] font-bold text-white shadow-md">
+          {power}
+        </span>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -388,33 +426,36 @@ export function Play() {
         </button>
       </div>
 
-      {/* Bot side */}
-      <PlayerStrip g={game} side={1} label="Bot" resolve={resolveCard} onTarget={onEnemyTargetClick} targetable={yourTurn && game.phase === 'attack' && !!attacker} />
+      {/* Playmat — capped width so the 1.7:1 mat ratio doesn't stretch the page absurdly tall on wide screens */}
+      <div className="mx-auto w-full max-w-2xl space-y-3">
+        {/* Bot side */}
+        <PlayerStrip g={game} side={1} label="Bot" resolve={resolveCard} onTarget={onEnemyTargetClick} targetable={yourTurn && game.phase === 'attack' && !!attacker} />
 
-      {/* status bar */}
-      <div
-        className={`rounded-xl border px-3 py-2.5 text-center text-sm font-medium ${
-          game.winner !== null
-            ? 'border-straw-500/50 bg-straw-500/10 text-straw-200'
+        {/* status bar */}
+        <div
+          className={`rounded-xl border px-3 py-2.5 text-center text-sm font-medium ${
+            game.winner !== null
+              ? 'border-straw-500/50 bg-straw-500/10 text-straw-200'
+              : game.active === 0
+                ? 'border-mantis-700/60 bg-mantis-900/30 text-mantis-100'
+                : 'border-slate-800 bg-ink-900/60 text-slate-400'
+          }`}
+          aria-live="polite"
+        >
+          {game.winner !== null
+            ? game.winner === 0 ? '🏴‍☠️ You win!' : 'Bot wins — try again.'
             : game.active === 0
-              ? 'border-mantis-700/60 bg-mantis-900/30 text-mantis-100'
-              : 'border-slate-800 bg-ink-900/60 text-slate-400'
-        }`}
-        aria-live="polite"
-      >
-        {game.winner !== null
-          ? game.winner === 0 ? '🏴‍☠️ You win!' : 'Bot wins — try again.'
-          : game.active === 0
-            ? game.phase === 'main'
-              ? `Your main phase · DON ${you.donAvailable}/${you.donTotal} · tap cards to attach DON or play from hand`
-              : attacker
-                ? '🎯 Pick a target: the bot Leader or a rested bot character'
-                : 'Your attack phase · tap an un-rested character or your Leader'
-            : '🤖 Bot is thinking…'}
-      </div>
+              ? game.phase === 'main'
+                ? `Your main phase · DON ${you.donAvailable}/${you.donTotal} · tap cards to attach DON or play from hand`
+                : attacker
+                  ? '🎯 Pick a target: the bot Leader or a rested bot character'
+                  : 'Your attack phase · tap an un-rested character or your Leader'
+              : '🤖 Bot is thinking…'}
+        </div>
 
-      {/* Your side */}
-      <PlayerStrip g={game} side={0} label="You" resolve={resolveCard} onCard={onYourCardClick} selected={attacker} />
+        {/* Your side */}
+        <PlayerStrip g={game} side={0} label="You" resolve={resolveCard} onCard={onYourCardClick} selected={attacker} />
+      </div>
 
       {/* Your hand */}
       <div>
@@ -431,7 +472,7 @@ export function Play() {
                   className={`w-full rounded-lg ring-1 transition ${playable ? 'ring-mantis-500 hover:-translate-y-1' : 'opacity-70 ring-slate-800'}`}
                   title={d.name}
                 >
-                  <CardFace card={resolveCard(id)} size="sm" />
+                  <BoardCard card={resolveCard(id)} />
                 </button>
               </CardTooltip>
             )
@@ -585,6 +626,7 @@ function PlayerStrip({
   const p = g.players[side]
   const leaderCard = resolve(p.leaderId)
   const enemy = side === 1
+  const matColor = COLOR_HEX[leaderCard?.color?.[0] ?? 'Black']
   // Dim your own cards that can't be acted on RIGHT NOW (out of DON in main, or
   // rested / summoning-sick in attack) so a tap that would no-op reads as inert.
   const yourTurnHere = !enemy && g.active === side && g.winner === null && !g.pending
@@ -594,41 +636,157 @@ function PlayerStrip({
     if (g.phase === 'attack') return rested || sick
     return false
   }
+  const donDeckLeft = Math.max(0, 10 - p.donTotal)
+
+  const lifeBox = (
+    <ZoneBox label="Life" className="flex-col items-center justify-between">
+      <div className="flex min-h-0 flex-1 flex-col-reverse items-center justify-start gap-0.5 overflow-hidden py-1">
+        {Array.from({ length: Math.min(p.life, 6) }).map((_, i) => (
+          <div key={i} className="h-1.5 w-4/5 shrink-0 rounded-sm" style={{ background: `${matColor}cc` }} />
+        ))}
+      </div>
+      <div className="shrink-0 text-sm font-black text-white">{p.life}</div>
+    </ZoneBox>
+  )
+
+  const characterBand = (
+    <ZoneBox label="Character Area">
+      <div className="grid min-h-0 flex-1 grid-cols-5 gap-1">
+        {Array.from({ length: 5 }).map((_, i) => {
+          const c = p.board[i]
+          if (!c) {
+            return <div key={`empty-${i}`} className="mx-auto aspect-[5/7] h-full rounded border border-dashed border-white/15" />
+          }
+          const targetableChar = enemy && targetable && c.rested
+          return (
+            <CardTooltip key={c.uid} card={resolve(c.cardId)} className="mx-auto aspect-[5/7] h-full">
+              <button
+                onClick={() => (enemy ? c.rested && onTarget?.(c.uid) : onCard?.(c.uid, c.rested, c.playedThisTurn))}
+                className={`h-full w-full rounded-lg ring-1 ${selected === c.uid ? 'ring-2 ring-straw-400' : targetableChar ? 'ring-2 ring-rose-500 animate-pulse' : 'ring-slate-700'} ${c.rested || ownInactive(c.rested, c.playedThisTurn) ? 'opacity-50' : ''}`}
+                title={def(g, c.cardId).name}
+              >
+                <BoardCard card={resolve(c.cardId)} power={def(g, c.cardId).power + c.attachedDon * 1000} className="h-full" />
+              </button>
+            </CardTooltip>
+          )
+        })}
+      </div>
+    </ZoneBox>
+  )
+
+  const leaderStageDeckBand = (
+    <div className="grid grid-cols-3 gap-1">
+      <ZoneBox label="Leader">
+        <CardTooltip card={leaderCard} className="mx-auto aspect-[5/7] h-full flex-1">
+          <button
+            onClick={() => (enemy ? onTarget?.('leader') : onCard?.('leader', p.leaderRested, false))}
+            className={`h-full w-full rounded-lg ring-2 ${selected === 'leader' ? 'ring-straw-400' : enemy && targetable ? 'ring-rose-500 animate-pulse' : 'ring-mantis-700/60'} ${p.leaderRested || ownInactive(p.leaderRested, false) ? 'opacity-50' : ''}`}
+            title="Leader"
+          >
+            <BoardCard card={leaderCard} power={effPower(g, side, 'leader')} className="h-full" />
+          </button>
+        </CardTooltip>
+      </ZoneBox>
+      <ZoneBox label="Stage">
+        <div className="mx-auto flex aspect-[5/7] h-full flex-1 items-center justify-center rounded border border-dashed border-white/15 text-white/20">
+          —
+        </div>
+      </ZoneBox>
+      <ZoneBox label="Deck">
+        <div
+          className="mx-auto flex aspect-[5/7] h-full flex-1 items-center justify-center rounded-lg border border-white/20 text-lg font-black text-white/70"
+          style={{ background: `linear-gradient(150deg, ${matColor}33, #0c0f17)` }}
+        >
+          {p.deck.length}
+        </div>
+      </ZoneBox>
+    </div>
+  )
+
+  const donCostTrashBand = (
+    <div className="grid grid-cols-[16%_1fr_16%] gap-1">
+      <ZoneBox label="DON!!" className="items-center justify-center">
+        <span className="text-sm font-black text-white/80">{donDeckLeft}</span>
+      </ZoneBox>
+      <ZoneBox label="Cost Area" className="flex-row flex-wrap content-center justify-center gap-1">
+        {p.donTotal === 0 ? (
+          <span className="text-[0.6rem] text-white/30">no DON</span>
+        ) : (
+          Array.from({ length: p.donTotal }).map((_, i) => (
+            <span
+              key={i}
+              className={`grid h-4 w-4 shrink-0 place-items-center rounded-full text-[0.5rem] font-black ${
+                i < p.donAvailable ? 'bg-straw-400 text-ink-950' : 'bg-white/10 text-white/30'
+              }`}
+            >
+              D
+            </span>
+          ))
+        )}
+      </ZoneBox>
+      <ZoneBox label="Trash" className="items-center justify-center">
+        <span className="text-sm font-black text-white/80">{p.trash.length}</span>
+      </ZoneBox>
+    </div>
+  )
+
+  // Bot's row mirrors the player's spatial layout (like two facing playmats):
+  // its bands stack DON!!/Cost/Trash → Leader/Stage/Deck → Character Area
+  // (character area ends up nearest the shared center divider), and its Life
+  // column sits on the opposite side. Nothing is visually rotated — every
+  // card and label stays upright.
+  const bandStack = (
+    <div className="grid grid-rows-3 gap-1">
+      {enemy ? (
+        <>
+          {donCostTrashBand}
+          {leaderStageDeckBand}
+          {characterBand}
+        </>
+      ) : (
+        <>
+          {characterBand}
+          {leaderStageDeckBand}
+          {donCostTrashBand}
+        </>
+      )}
+    </div>
+  )
+
   return (
-    <div className="rounded-2xl border border-slate-800 bg-ink-850/40 p-2">
+    <div
+      className="rounded-2xl border-2 p-2"
+      style={{
+        borderColor: `${matColor}99`,
+        background: `radial-gradient(130% 170% at 50% -20%, ${matColor}66, ${matColor}26 45%, #11141d 82%), repeating-linear-gradient(135deg, ${matColor}1a 0px, ${matColor}1a 2px, transparent 2px, transparent 9px)`,
+        boxShadow: `inset 0 0 24px ${matColor}40`,
+      }}
+    >
       <div className="mb-1.5 flex items-center justify-between text-xs">
         <span className="font-semibold text-mantis-200">{label}</span>
         <span className="text-slate-400">
           ❤️ {p.life} · DON {p.donAvailable}/{p.donTotal} · hand {p.hand.length}
         </span>
       </div>
-      <div className="flex items-end gap-2 overflow-x-auto pb-1">
-        {/* leader */}
-        <CardTooltip card={leaderCard} className="w-16 shrink-0">
-          <button
-            onClick={() => (enemy ? onTarget?.('leader') : onCard?.('leader', p.leaderRested, false))}
-            className={`w-full rounded-lg ring-2 ${selected === 'leader' ? 'ring-straw-400' : enemy && targetable ? 'ring-rose-500 animate-pulse' : 'ring-mantis-700/60'} ${p.leaderRested || ownInactive(p.leaderRested, false) ? 'opacity-50' : ''}`}
-            title="Leader"
-          >
-            <CardFace card={leaderCard} power={effPower(g, side, 'leader')} size="sm" />
-          </button>
-        </CardTooltip>
-        {/* characters */}
-        {p.board.map((c) => {
-          const targetableChar = enemy && targetable && c.rested
-          return (
-            <CardTooltip key={c.uid} card={resolve(c.cardId)} className="w-14 shrink-0">
-              <button
-                onClick={() => (enemy ? c.rested && onTarget?.(c.uid) : onCard?.(c.uid, c.rested, c.playedThisTurn))}
-                className={`w-full rounded-lg ring-1 ${selected === c.uid ? 'ring-2 ring-straw-400' : targetableChar ? 'ring-2 ring-rose-500 animate-pulse' : 'ring-slate-700'} ${c.rested || ownInactive(c.rested, c.playedThisTurn) ? 'opacity-50' : ''}`}
-                title={def(g, c.cardId).name}
-              >
-                <CardFace card={resolve(c.cardId)} power={def(g, c.cardId).power + c.attachedDon * 1000} size="xs" />
-              </button>
-            </CardTooltip>
-          )
-        })}
-        {p.board.length === 0 && <span className="py-6 text-[0.65rem] text-slate-600">no characters</span>}
+
+      {/* Functional playmat zone grid — 600:350 (~1.7:1), CSS-only, no third-party mat art. */}
+      {/* Below `lg:` (this app's mobile/desktop boundary — matches Sidebar/BottomTabs) the
+          strict 12:7 mat ratio squeezes card tap-targets under ~35px, so phones get a taller,
+          looser box with a fixed floor instead; `lg:` and up keeps the faithful playmat ratio. */}
+      <div
+        className={`grid max-lg:aspect-auto max-lg:min-h-[260px] lg:aspect-[12/7] gap-1 ${enemy ? 'grid-cols-[1fr_12%]' : 'grid-cols-[12%_1fr]'}`}
+      >
+        {enemy ? (
+          <>
+            {bandStack}
+            {lifeBox}
+          </>
+        ) : (
+          <>
+            {lifeBox}
+            {bandStack}
+          </>
+        )}
       </div>
     </div>
   )
@@ -669,11 +827,11 @@ function DefenseModal({
         {/* attacker vs defender preview */}
         <div className="mt-3 flex items-center justify-center gap-3">
           <CardTooltip card={attackerCard} className="w-16">
-            <CardFace card={attackerCard} power={pd.baseAttackPower} size="sm" />
+            <BoardCard card={attackerCard} power={pd.baseAttackPower} />
           </CardTooltip>
           <span className="text-lg" aria-hidden="true">⚔️</span>
           <CardTooltip card={targetCard} className="w-16">
-            <CardFace card={targetCard} power={targetPow} size="sm" />
+            <BoardCard card={targetCard} power={targetPow} />
           </CardTooltip>
         </div>
 
@@ -692,7 +850,7 @@ function DefenseModal({
                     className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
                   >
                     <span className="w-7 shrink-0">
-                      <CardFace card={resolve(c.cardId)} size="xs" />
+                      <BoardCard card={resolve(c.cardId)} />
                     </span>
                     🛡 {def(g, c.cardId).name}
                   </button>
@@ -712,7 +870,7 @@ function DefenseModal({
                     className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
                   >
                     <span className="w-7 shrink-0">
-                      <CardFace card={resolve(id)} size="xs" />
+                      <BoardCard card={resolve(id)} />
                     </span>
                     +{def(g, id).counter} {def(g, id).name}
                   </button>

@@ -62,3 +62,6 @@ dev-dist
 crashlytics-build.properties
 sloth.log
 # NOTE: do NOT ignore *.meta — Unity needs them committed.
+
+# Claude Code session data
+.claude/data/

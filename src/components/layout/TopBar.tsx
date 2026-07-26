@@ -1,20 +1,20 @@
 import { useLocation } from 'react-router-dom'
-import { UserButton } from '@clerk/clerk-react'
 import { NAV_ITEMS } from './nav'
 import { OfflineBadge } from '../pwa/OfflineBadge'
 import { Logo } from '../ui/Logo'
 import { LanguageToggle } from '../ui/LanguageToggle'
+import { AccountMenu } from './AccountMenu'
+import { useLanguage, t } from '../../i18n/LanguageContext'
 import { useProgress, levelForXp, levelProgress } from '../../store/useProgress'
-import { CLERK_APPEARANCE } from '../auth/AuthLanding'
 
 export function TopBar() {
   const { pathname } = useLocation()
+  const { lang } = useLanguage()
   const { xp, title } = useProgress()
   const level = levelForXp(xp)
   const prog = levelProgress(xp)
-  const current =
-    NAV_ITEMS.find((i) => (i.to === '/' ? pathname === '/' : pathname.startsWith(i.to)))
-      ?.label ?? 'One Piece TCG'
+  const currentItem = NAV_ITEMS.find((i) => (i.to === '/' ? pathname === '/' : pathname.startsWith(i.to)))
+  const current = currentItem ? t(lang, currentItem.label) : 'One Piece TCG'
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-800 bg-ink-950/80 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur">
@@ -37,7 +37,11 @@ export function TopBar() {
             <div className="h-full rounded-full bg-mantis-400" style={{ width: `${prog.pct}%` }} />
           </div>
         </div>
-        <UserButton afterSignOutUrl="/" appearance={CLERK_APPEARANCE} />
+        {/* Mobile keeps the account avatar in the floating bottom-right button instead
+            (see MobileAccountButton) — this one only shows once the sidebar takes over. */}
+        <div className="hidden lg:block">
+          <AccountMenu />
+        </div>
       </div>
     </header>
   )

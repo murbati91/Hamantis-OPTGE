@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useCollection } from '../store/useCollection'
-import { CardFace } from '../components/ui/CardFace'
-import { buildDeck, buildResultToDeck, type BuildResult } from '../features/deckbuilder/aiBuilder'
+import { CardImage } from '../components/ui/CardImage'
+import { buildDeck, buildResultToDeck, DECK_SIZE, type BuildResult } from '../features/deckbuilder/aiBuilder'
 import { refineWithClaude } from '../features/deckbuilder/claudeRefine'
+import { DeckAnalysisPanel } from '../components/deck/DeckAnalysisPanel'
 import type { Card, CardColor } from '../types'
 
 type Mode = 'leader' | 'strategy'
 const COLORS: CardColor[] = ['Red', 'Green', 'Blue', 'Purple', 'Black', 'Yellow']
 
 export function AIDeckBuilder() {
-  const { fullIndex, settings, setSettings, upsertDeck } = useCollection()
-  const [keyDraft, setKeyDraft] = useState('')
+  const { fullIndex, upsertDeck } = useCollection()
   const pool = useMemo(() => Object.values(fullIndex), [fullIndex])
   const leaders = useMemo(
     () => pool.filter((c) => c.type === 'Leader').sort((a, b) => a.id.localeCompare(b.id)),
@@ -51,21 +51,20 @@ export function AIDeckBuilder() {
   }
 
   const askClaude = async () => {
-    if (!result || !settings.anthropicKey) return
+    if (!result) return
     setRefining(true); setRefineErr(null); setRefine(null)
     try {
       const deckCards = Object.entries(result.deck)
         .map(([id, count]) => ({ card: fullIndex[id], count }))
         .filter((d): d is { card: Card; count: number } => Boolean(d.card))
       const text = await refineWithClaude({
-        apiKey: settings.anthropicKey,
         leaderName: result.leader.name,
         archetype: result.archetype,
         deckCards,
       })
       setRefine(text)
     } catch (e) {
-      setRefineErr(e instanceof Error ? e.message : 'Claude request failed.')
+      setRefineErr(e instanceof Error ? e.message : 'AI refinement is currently unavailable. Your deck was still built using local deck logic.')
     } finally {
       setRefining(false)
     }
@@ -119,7 +118,7 @@ export function AIDeckBuilder() {
                 className={`rounded-lg p-1 transition ${leaderId === l.id ? 'ring-2 ring-mantis-500' : 'opacity-80 hover:opacity-100'}`}
                 title={`${l.name} (${l.id})`}
               >
-                <CardFace card={l} size="sm" />
+                <CardImage card={l} />
               </button>
             ))}
           </div>
@@ -164,7 +163,7 @@ export function AIDeckBuilder() {
         <div className="space-y-4 rounded-2xl border border-slate-800 bg-ink-900/60 p-4">
           <div className="flex items-start gap-4">
             <div className="w-24 shrink-0">
-              <CardFace card={result.leader} size="md" />
+              <CardImage card={result.leader} />
             </div>
             <div className="min-w-0">
               <h2 className="text-lg font-bold text-mantis-200">{result.archetype}</h2>
@@ -178,26 +177,9 @@ export function AIDeckBuilder() {
             <button onClick={save} className="rounded-lg bg-straw-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-straw-500">
               💾 {saved ? 'Saved!' : 'Save deck'}
             </button>
-            {settings.anthropicKey ? (
-              <button onClick={askClaude} disabled={refining} className="rounded-lg border border-mantis-600 px-3 py-1.5 text-xs font-bold text-mantis-200 hover:bg-mantis-900/40 disabled:opacity-50">
-                {refining ? '🤖 Claude is thinking…' : '🤖 Refine with Claude'}
-              </button>
-            ) : (
-              <div className="flex flex-1 items-center gap-2">
-                <input
-                  type="password"
-                  value={keyDraft}
-                  onChange={(e) => setKeyDraft(e.target.value)}
-                  placeholder="Anthropic API key (optional) — stored on this device"
-                  autoComplete="off"
-                  className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-ink-850 px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:border-mantis-600 focus:outline-none"
-                />
-                <button
-                  onClick={() => keyDraft.trim() && setSettings({ anthropicKey: keyDraft.trim() })}
-                  className="shrink-0 rounded-lg border border-mantis-600 px-2.5 py-1.5 text-xs font-bold text-mantis-200 hover:bg-mantis-900/40"
-                >Save key</button>
-              </div>
-            )}
+            <button onClick={askClaude} disabled={refining} className="rounded-lg border border-mantis-600 px-3 py-1.5 text-xs font-bold text-mantis-200 hover:bg-mantis-900/40 disabled:opacity-50">
+              {refining ? '🤖 Claude is thinking…' : '🤖 Refine with Claude'}
+            </button>
           </div>
 
           {refineErr && <div className="rounded-lg bg-mantis-900/30 p-2 text-xs text-mantis-200">{refineErr}</div>}
@@ -206,6 +188,15 @@ export function AIDeckBuilder() {
               {refine}
             </div>
           )}
+
+          {/* Role distribution + composition-target readout, with weak-deck notes */}
+          <DeckAnalysisPanel
+            targets={result.analysis.targets}
+            notes={result.analysis.notes}
+            curve={result.curve}
+            size={Object.values(result.deck).reduce((n, c) => n + c, 0)}
+            targetSize={DECK_SIZE}
+          />
 
           {/* Deck list grouped by cost */}
           <DeckList deck={result.deck} index={fullIndex} />
@@ -231,7 +222,7 @@ function DeckList({ deck, index }: { deck: Record<string, number>; index: Record
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
         {groups.map(({ card, count }) => (
           <div key={card.id} className="relative">
-            <CardFace card={card} size="sm" />
+            <CardImage card={card} />
             <span className="absolute -right-1.5 -top-1.5 z-20 rounded-full border-2 border-ink-950 bg-mantis-600 px-1.5 py-0.5 text-[0.65rem] font-bold text-white shadow-md">
               ×{count}
             </span>

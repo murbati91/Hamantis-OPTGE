@@ -3,11 +3,12 @@ import { useCollection } from '../store/useCollection'
 import { useProgress } from '../store/useProgress'
 import { generateSealedPool } from '../features/sealed/poolGenerator'
 import { analyzeDeck, DECK_TARGET_SIZE, deckSize } from '../features/sealed/deckEngine'
-import { CardFace } from '../components/ui/CardFace'
+import { CardImage } from '../components/ui/CardImage'
 import { CardTooltip } from '../components/ui/CardTooltip'
 import { RatingPill } from '../components/ui/RatingPill'
 import { ColorDot } from '../components/ui/Badge'
-import type { Card, Deck, PoolCard, SealedPool, TargetStatus } from '../types'
+import { DeckAnalysisPanel } from '../components/deck/DeckAnalysisPanel'
+import type { Card, Deck, PoolCard, SealedPool } from '../types'
 
 type SortMode = 'rating' | 'cost'
 
@@ -192,7 +193,7 @@ export function DeckBuilder() {
                     }`}
                   >
                     <CardTooltip card={l} className="w-full">
-                      <CardFace card={l} size="md" />
+                      <CardImage card={l} />
                     </CardTooltip>
                     <div className="mt-2 line-clamp-1 text-sm font-medium text-slate-100">
                       {l.name}
@@ -211,38 +212,17 @@ export function DeckBuilder() {
 
           {/* Analysis */}
           <section className="rounded-2xl border border-mantis-800/40 bg-mantis-900/20 p-4">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-mantis-200">
-                Deck analysis
-              </h2>
-              <span
-                className={`text-lg font-bold ${
-                  size === DECK_TARGET_SIZE ? 'text-mantis-200' : 'text-amber-300'
-                }`}
-              >
-                {size}/{DECK_TARGET_SIZE}
-              </span>
-            </div>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-mantis-200">
+              Deck analysis
+            </h2>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {analysis.targets.map((t) => (
-                <TargetChip key={t.label} t={t} />
-              ))}
-            </div>
-
-            {/* Mana curve */}
-            <ManaCurve curve={analysis.curve} />
-
-            {analysis.notes.length > 0 && (
-              <ul className="mt-3 space-y-1">
-                {analysis.notes.map((n, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-slate-300">
-                    <span className="text-mantis-400">›</span>
-                    {n}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <DeckAnalysisPanel
+              targets={analysis.targets}
+              notes={analysis.notes}
+              curve={analysis.curve}
+              size={size}
+              targetSize={DECK_TARGET_SIZE}
+            />
 
             {/* Save */}
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -286,7 +266,7 @@ export function DeckBuilder() {
                     className="rounded-xl border border-slate-800 bg-ink-850/50 p-2"
                   >
                     <CardTooltip card={g.card} className="relative w-full">
-                      <CardFace card={g.card} size="sm" />
+                      <CardImage card={g.card} />
                       <span className="absolute -right-1.5 -top-1.5 z-20">
                         <RatingPill rating={g.card.sealedRating} />
                       </span>
@@ -378,50 +358,3 @@ export function DeckBuilder() {
   )
 }
 
-function TargetChip({ t }: { t: TargetStatus }) {
-  const cls =
-    t.status === 'ok'
-      ? 'border-mantis-600/50 bg-mantis-900/30 text-mantis-200'
-      : t.status === 'low'
-        ? 'border-amber-600/50 bg-amber-900/20 text-amber-200'
-        : 'border-rose-600/50 bg-rose-900/20 text-rose-200'
-  return (
-    <div className={`rounded-xl border p-2 ${cls}`}>
-      <div className="text-sm font-bold">
-        {t.count}
-        <span className="text-xs font-normal opacity-70">
-          {' '}
-          / {t.min}–{t.max}
-        </span>
-      </div>
-      <div className="text-xs">{t.label}</div>
-    </div>
-  )
-}
-
-function ManaCurve({ curve }: { curve: Record<number, number> }) {
-  const costs = Array.from({ length: 11 }, (_, i) => i) // 0..10
-  const max = Math.max(1, ...costs.map((c) => curve[c] ?? 0))
-  const hasAny = costs.some((c) => (curve[c] ?? 0) > 0)
-  if (!hasAny) return null
-  return (
-    <div className="mt-4">
-      <div className="mb-1 text-xs font-medium text-slate-400">Mana curve</div>
-      <div className="flex items-end gap-1">
-        {costs.map((c) => {
-          const n = curve[c] ?? 0
-          return (
-            <div key={c} className="flex flex-1 flex-col items-center gap-1">
-              <div className="text-[0.6rem] text-slate-400">{n || ''}</div>
-              <div
-                className="w-full rounded-t bg-mantis-500/80"
-                style={{ height: `${Math.round((n / max) * 56)}px`, minHeight: n > 0 ? 4 : 0 }}
-              />
-              <div className="text-[0.6rem] text-slate-500">{c}</div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}

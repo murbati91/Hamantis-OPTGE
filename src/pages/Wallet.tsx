@@ -1,11 +1,12 @@
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCollection } from '../store/useCollection'
-import { CardFace } from '../components/ui/CardFace'
+import { CardImage } from '../components/ui/CardImage'
 import { CardTooltip } from '../components/ui/CardTooltip'
 import { RatingPill } from '../components/ui/RatingPill'
 import { is2kCounter, isBlocker, isRemoval } from '../lib/cards'
 import { InfoTip } from '../components/ui/InfoTip'
+import { useLanguage, t } from '../i18n/LanguageContext'
 import type { Card, CardColor, CardType, Rarity } from '../types'
 
 type OwnedFilter = 'all' | 'owned' | 'missing'
@@ -16,6 +17,7 @@ const RARITIES: Rarity[] = ['L', 'C', 'UC', 'R', 'SR', 'SEC', 'P', 'AA', 'MR']
 
 export function Wallet() {
   const { cardIndex, entries, settings } = useCollection()
+  const { lang } = useLanguage()
 
   const [q, setQ] = useState('')
   const [color, setColor] = useState<CardColor | ''>('')
@@ -100,6 +102,17 @@ export function Wallet() {
 
   return (
     <div className="space-y-4">
+      {/* Privacy notice — visible on mobile and desktop */}
+      <div className="flex items-center gap-2 rounded-xl border border-mantis-800/50 bg-mantis-900/20 px-3 py-2 text-xs font-medium text-mantis-200">
+        <span aria-hidden="true">🔒</span>
+        <span>
+          {t(lang, {
+            en: 'Your private collection — only visible to you.',
+            ar: 'مجموعتك الخاصة — مرئية لك فقط.',
+          })}
+        </span>
+      </div>
+
       {/* Search + add */}
       <div className="flex gap-2">
         <input
@@ -215,7 +228,7 @@ const WalletCard = memo(function WalletCard({
             owned ? '' : 'opacity-65 grayscale-[0.3] group-hover:opacity-100 group-hover:grayscale-0'
           }`}
         >
-          <CardFace card={card} size="sm" />
+          <CardImage card={card} />
         </div>
 
         {owned && (

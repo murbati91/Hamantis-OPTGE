@@ -32,11 +32,11 @@ function readInitialLang(): Lang {
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(readInitialLang)
 
-  // Keep <html lang> in sync for accessibility & correct font shaping.
-  // NOTE: document `dir` is applied per-page (see PlayGuide) rather than
-  // globally, so English pages keep their LTR layout until they're localized.
+  // Keep <html lang>/<html dir> in sync app-wide — every page gets the right
+  // reading direction and font shaping, not just pages that opt in locally.
   useEffect(() => {
     document.documentElement.lang = lang
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     try {
       window.localStorage.setItem(STORAGE_KEY, lang)
     } catch {

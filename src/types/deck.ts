@@ -53,6 +53,8 @@ export interface TargetStatus {
   min: number
   max: number
   status: 'low' | 'ok' | 'high'
+  /** One-line explanation of why this role matters, shown in the analysis UI. */
+  hint: string
 }
 
 export type ResolvedPoolCard = PoolCard & { card: Card }

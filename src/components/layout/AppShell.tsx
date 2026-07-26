@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { BottomTabs } from './BottomTabs'
+import { MobileAccountButton } from './MobileAccountButton'
 import { InstallPrompt } from '../pwa/InstallPrompt'
 import { useCollection } from '../../store/useCollection'
 
@@ -29,6 +30,7 @@ export function AppShell() {
         </main>
       </div>
       <BottomTabs />
+      <MobileAccountButton />
       <InstallPrompt />
     </div>
   )

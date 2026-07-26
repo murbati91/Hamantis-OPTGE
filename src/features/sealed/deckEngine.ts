@@ -46,17 +46,13 @@ export function analyzeDeck(deck: Deck, index: Record<string, Card>): DeckAnalys
     const count = byLabel[t.label] ?? 0
     const status: TargetStatus['status'] =
       count < t.min ? 'low' : count > t.max ? 'high' : 'ok'
-    return { label: t.label, count, min: t.min, max: t.max, status }
+    return { label: t.label, count, min: t.min, max: t.max, status, hint: t.hint }
   })
 
+  // Per-target low/high call-outs now render inline in DeckAnalysisPanel's rows,
+  // so notes[] is reserved for aggregate insights that don't fit any one target.
   const notes: string[] = []
-  if (total < DECK_TARGET_SIZE) notes.push(`Add ${DECK_TARGET_SIZE - total} more cards to reach 40.`)
-  if (total > DECK_TARGET_SIZE) notes.push(`Cut ${total - DECK_TARGET_SIZE} cards down to 40.`)
   if (!deck.leaderId) notes.push('Pick a leader to build around.')
-  for (const t of targets) {
-    if (t.status === 'low') notes.push(`${t.label}: ${t.count}/${t.min}–${t.max} — too few.`)
-    if (t.status === 'high') notes.push(`${t.label}: ${t.count}/${t.min}–${t.max} — consider trimming.`)
-  }
   if (finishers >= 6) notes.push('Too many finishers — cut the highest-cost cards first.')
 
   return {

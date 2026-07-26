@@ -57,6 +57,42 @@ export function isRemoval(card: Card): boolean {
   )
 }
 
+/** 1000+ power counter value in hand (the broader "counter" role, vs. the strict 2K filter above). */
+export function isCounter(card: Card): boolean {
+  return (card.counter ?? 0) >= 1000 || is2kCounter(card)
+}
+
+export function isRush(card: Card): boolean {
+  return /\[rush\]/i.test(card.effect ?? '')
+}
+
+/** Card draw / hand or board information advantage (not deck-searching — see isSearcher). */
+export function isDraw(card: Card): boolean {
+  return /\bdraw\b|\blook at (the )?top\b|\breveal\b/i.test(card.effect ?? '')
+}
+
+/** Deck-thinning / tutor effects — finding a specific piece rather than just drawing. */
+export function isSearcher(card: Card): boolean {
+  return /\bsearch your (deck|trash)\b|\badd it to your hand\b|\blook at (up to )?\d+ cards? (of|from) your deck\b/i.test(
+    card.effect ?? '',
+  )
+}
+
+/** DON!! ramp/acceleration — adding or reusing DON!! beyond the printed rate-of-1-per-turn. */
+export function isDonRamp(card: Card): boolean {
+  return /\bdon!!.*(add|rest|return)\b|\badd .*don!!\b|\bdon!! card/i.test(card.effect ?? '')
+}
+
+/** High-impact closers: big attackers or on-attack effects meant to end the game. */
+export function isFinisher(card: Card): boolean {
+  if (card.type !== 'Character') return false
+  const cost = card.cost ?? 0
+  const power = card.power ?? 0
+  if (cost >= 7 && power >= 8000) return true
+  if (power >= 9000) return true
+  return /\bk\.?o\.?\b.*\bwhen attacking\b|\bwhen attacking\b.*\bk\.?o\.?\b/i.test(card.effect ?? '')
+}
+
 /**
  * Browsable wallet index = the COMPLETE real card universe (all sets) + user
  * custom cards. (Custom cards override a real card on id clash, e.g. a

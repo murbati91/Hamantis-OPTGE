@@ -1,9 +1,11 @@
 import { NavLink } from 'react-router-dom'
 import { NAV_ITEMS } from './nav'
 import { Logo } from '../ui/Logo'
+import { useLanguage, t } from '../../i18n/LanguageContext'
 
 /** Desktop / tablet sidebar (hidden on mobile, where bottom tabs are used). */
 export function Sidebar() {
+  const { lang } = useLanguage()
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-800 bg-ink-900 lg:flex">
       <div className="flex items-center gap-2.5 px-5 py-5">
@@ -28,7 +30,7 @@ export function Sidebar() {
             }
           >
             <span className="text-lg" aria-hidden="true">{item.icon}</span>
-            {item.label}
+            {t(lang, item.label)}
           </NavLink>
         ))}
       </nav>

@@ -85,3 +85,16 @@ export const DECK_COMPOSITION_TARGETS: CompositionTarget[] = [
   { label: 'Mid threats', min: 5, max: 7, hint: 'Take over the midgame.' },
   { label: 'Finishers', min: 3, max: 5, hint: 'Close the game.' },
 ]
+
+// 50-card constructed deck composition targets, scaled for the full
+// constructed format (vs. the 40-card sealed handbook targets above).
+export const CONSTRUCTED_50_TARGETS: CompositionTarget[] = [
+  { label: 'Counters (1K+)', min: 10, max: 18, hint: 'Hand defense backbone — keep enough to survive.' },
+  { label: 'Blockers', min: 3, max: 8, hint: 'Protect your Leader and stall aggro.' },
+  { label: 'Removal', min: 3, max: 10, hint: 'Answer their biggest threats.' },
+  { label: 'Early bodies', min: 8, max: 18, hint: 'Curve out turns 1–3, apply early pressure.' },
+  { label: 'Mid threats', min: 8, max: 18, hint: 'Take over the midgame.' },
+  { label: 'Finishers', min: 2, max: 8, hint: 'Close the game once ahead.' },
+  { label: 'Searchers', min: 0, max: 8, hint: 'Consistency — find your key pieces.' },
+  { label: 'Events', min: 0, max: 6, hint: 'One-shot effects; too many hurts board presence.' },
+]

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { PRIMARY_NAV, SECONDARY_NAV } from './nav'
+import { useLanguage, t } from '../../i18n/LanguageContext'
 
 /** Mobile bottom-tab navigation with a "More" sheet. Hidden on large screens. */
 export function BottomTabs() {
   const [moreOpen, setMoreOpen] = useState(false)
   const { pathname } = useLocation()
+  const { lang } = useLanguage()
   const onSecondary = SECONDARY_NAV.some((i) =>
     i.to === '/' ? pathname === '/' : pathname.startsWith(i.to),
   )
@@ -49,7 +51,7 @@ export function BottomTabs() {
                   }
                 >
                   <span className="text-lg" aria-hidden="true">{item.icon}</span>
-                  {item.label}
+                  {t(lang, item.label)}
                 </NavLink>
               ))}
             </div>
@@ -68,7 +70,7 @@ export function BottomTabs() {
                 className={({ isActive }) => tabClass(isActive)}
               >
                 <span className="text-xl leading-none" aria-hidden="true">{item.icon}</span>
-                {item.label}
+                {t(lang, item.label)}
               </NavLink>
             </li>
           ))}

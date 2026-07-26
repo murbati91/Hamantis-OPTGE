@@ -7,8 +7,10 @@ import { SignIn } from '@clerk/clerk-react'
  */
 export const CLERK_APPEARANCE = {
   layout: {
-    logoImageUrl: 'https://onepiecetcggcc.com/icons/strawhat-logo.png',
-    logoLinkUrl: 'https://onepiecetcggcc.com',
+    // Local same-origin asset (precached by the SW) — never reaches out to the
+    // production host, so it works in dev and offline. See public/icons/.
+    logoImageUrl: '/icons/strawhat-logo.png',
+    logoLinkUrl: '/',
     logoPlacement: 'inside',
   },
   variables: {
